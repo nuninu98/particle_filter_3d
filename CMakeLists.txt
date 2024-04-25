@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(particle_filter_3d)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+add_compile_options(-std=c++14)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -14,6 +14,8 @@ find_package(catkin REQUIRED COMPONENTS
   sensor_msgs
   visualization_msgs
 )
+find_package(PCL 1.8 REQUIRED)
+find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -105,10 +107,10 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
-#  LIBRARIES particle_filter_3d
-#  CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs visualization_msgs
-#  DEPENDS system_lib
+  INCLUDE_DIRS include
+  LIBRARIES particle_filter_3d
+  CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs visualization_msgs
+  DEPENDS system_lib
 )
 
 ###########
@@ -118,15 +120,35 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/particle_filter_3d.cpp
-# )
+add_library(particle_filter_datatype_lib
+  src/data_types/particle.cpp
+)
+add_dependencies(particle_filter_datatype_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(particle_filter_datatype_lib
+  ${catkin_LIBRARIES}
+  Eigen3::Eigen 
+)
 
+add_library(particle_filter_api
+  src/api_class/particle_filter.cpp
+)
+add_dependencies(particle_filter_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(particle_filter_api
+  ${catkin_LIBRARIES}
+  particle_filter_datatype_lib 
+)
+
+add_executable(test_particle_filter src/test_node/test_particle_filter.cpp)
+add_dependencies(test_particle_filter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_particle_filter
+  ${catkin_LIBRARIES}
+  particle_filter_api
+)
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
