@@ -18,6 +18,8 @@ class Particle{
         double getWeight() const;
 
         void setWeight(const double& weight);
+
+        Eigen::Matrix4d getPose() const;
 };
 
 #endif

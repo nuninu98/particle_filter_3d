@@ -24,3 +24,7 @@ double Particle::getWeight() const{
 void Particle::setWeight(const double& weight){
     weight_ = weight;
 }
+
+Eigen::Matrix4d Particle::getPose() const{
+    return pose_;
+}

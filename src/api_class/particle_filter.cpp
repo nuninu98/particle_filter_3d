@@ -78,11 +78,25 @@ void ParticleFilter::initialize(const Eigen::Matrix4d& pose){
         Particle p(toSE3(pose6d));
         particles_.push_back(p);
     }
+    calculatePose();
 }
 
 void ParticleFilter::calculatePose(){
-    for(const auto& p : particles_){
-        
+    Eigen::Vector3d pose_avg = Eigen::Vector3d::Zero();
+    Eigen::MatrixXd Q(4, N_particles_);
+    for(int i = 0; i < N_particles_; ++i){
+        Eigen::Matrix4d pose = particles_[i].getPose();
+        Eigen::Quaterniond q(pose.block<3, 3>(0, 0));
+        Eigen::Vector4d q_vec(q.x(), q.y(), q.z(), q.w());
+        Q.col(i) = q_vec;
     }
+    Eigen::MatrixXd QQT = Q * Q.transpose();
+    Eigen::JacobiSVD<Eigen::Matrix4d> svd(QQT, Eigen::ComputeFullU | Eigen::ComputeFullV);
+    Eigen::MatrixXd V = svd.matrixV();
+    Eigen::Quaterniond quat_avg(V(3, 0), V(0, 0), V(1, 0), V(2, 0));
+    pose_.block<3, 3>(0, 0) = quat_avg.toRotationMatrix();
+    pose_(0, 3) = pose_avg(0);
+    pose_(1, 3) = pose_avg(1);
+    pose_(2, 3) = pose_avg(2);
 }
 
