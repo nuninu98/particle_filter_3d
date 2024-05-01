@@ -15,7 +15,7 @@ class Particle{
 
         double getWeight() const;
 
-        void setWeight();
+        void setWeight(const double& weight);
 };
 
 #endif

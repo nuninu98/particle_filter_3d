@@ -17,6 +17,6 @@ double Particle::getWeight() const{
 
 }
 
-void Particle::setWeight(){
-
+void Particle::setWeight(const double& weight){
+    weight_ = weight;
 }
