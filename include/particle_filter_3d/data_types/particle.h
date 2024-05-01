@@ -9,6 +9,8 @@ class Particle{
     public:
         Particle();
 
+        Particle(const Eigen::Matrix4d& pose);
+
         ~Particle();
 
         void predict(const Eigen::Matrix4d& motion_gap);

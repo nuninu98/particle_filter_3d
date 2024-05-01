@@ -4,6 +4,10 @@ Particle::Particle(): weight_(0.0), pose_(Eigen::Matrix4d::Identity()){
 
 }
 
+Particle::Particle(const Eigen::Matrix4d& pose): weight_(0.0), pose_(pose){
+
+}
+
 Particle::~Particle(){
 
 }
