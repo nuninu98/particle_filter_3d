@@ -1,12 +1,13 @@
 #include <particle_filter_3d/api_class/particle_filter.h>
 
-ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()){
+ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()),
+tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_){
     nh_.setCallbackQueue(&queue_);
     particles_.resize(N_particles_, Particle());
     sub_lidar_ = nh_.subscribe("lidar_topic", 1, &ParticleFilter::lidarCallback, this);
     sub_odometry_ = nh_.subscribe("odom_topic", 1, &ParticleFilter::odomCallback, this);
     spinner_.start();
-
+    //buffer_.lookupTransform("base_link", "velodyne", ros::Time(0));
 }
 
 ParticleFilter::~ParticleFilter(){  
@@ -16,7 +17,9 @@ ParticleFilter::~ParticleFilter(){
 void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
     unique_lock<mutex> lock(mtx_);
     //========================Particle Estimation========================
-
+    pcl::PointCloud<pcl::PointXYZI> raw_lidar, lidar_robot;
+    pcl::fromROSMsg(*cloud, raw_lidar);
+    pcl::transformPointCloud(raw_lidar, lidar_robot, tf_lidar2_robot_);
     //===================================================================
 }
 

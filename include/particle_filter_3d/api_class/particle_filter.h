@@ -2,6 +2,7 @@
 #define __MORIN_PARTICLE_FILTER_H__
 
 #include <particle_filter_3d/data_types/particle.h>
+#include <particle_filter_3d/data_types/gridmap_3d.h>
 #include <vector>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
@@ -11,7 +12,14 @@
 #include <nav_msgs/Odometry.h>
 #include <mutex>
 #include <random>
-
+#include <tf2_ros/transform_listener.h>
+#include <tf2_ros/buffer.h>
+#include <tf2_ros/transform_broadcaster.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/conversions.h>
+#include <pcl/filters/voxel_grid.h>
+#include <pcl/common/transforms.h>
+#include <pcl/io/pcd_io.h>
 using namespace std;
 
 class ParticleFilter{
@@ -24,6 +32,14 @@ class ParticleFilter{
         ros::Subscriber sub_odometry_;
         ros::Subscriber sub_lidar_;
         Eigen::Matrix4d pose_;
+        Eigen::Matrix4d tf_lidar2_robot_;
+
+        tf2_ros::Buffer buffer_;
+        tf2_ros::TransformListener listener_;
+        tf2_ros::TransformBroadcaster broadcaster_;
+
+        
+
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud);
 
         void odomCallback(const nav_msgs::OdometryConstPtr& odom);

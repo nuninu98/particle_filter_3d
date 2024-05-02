@@ -13,6 +13,8 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   visualization_msgs
+  tf2_ros
+  pcl_conversions
 )
 find_package(PCL 1.8 REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
@@ -109,7 +111,7 @@ find_package (Eigen3 3.3 REQUIRED NO_MODULE)
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES particle_filter_3d
-  CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs visualization_msgs
+  CATKIN_DEPENDS nav_msgs roscpp rospy sensor_msgs visualization_msgs tf2_ros pcl_conversions
   DEPENDS system_lib
 )
 
@@ -127,11 +129,13 @@ include_directories(
 ## Declare a C++ library
 add_library(particle_filter_datatype_lib
   src/data_types/particle.cpp
+  src/data_types/gridmap_3d.cpp
 )
 add_dependencies(particle_filter_datatype_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(particle_filter_datatype_lib
   ${catkin_LIBRARIES}
-  Eigen3::Eigen 
+  Eigen3::Eigen
+  ${PCL_LIBRARIES} 
 )
 
 add_library(particle_filter_api
