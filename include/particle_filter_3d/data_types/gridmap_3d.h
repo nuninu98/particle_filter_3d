@@ -20,7 +20,7 @@ class GridMap3D{
 
         ~GridMap3D();
 
-        void initialize(double x_size, double y_size_, double z_size_, double resolution);
+        void initialize(double x_size, double y_size, double z_size, double resolution);
 
         void generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose);
 

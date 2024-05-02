@@ -20,6 +20,9 @@
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/common/transforms.h>
 #include <pcl/io/pcd_io.h>
+#include <thread>
+#include <condition_variable>
+#include <queue>
 using namespace std;
 
 class ParticleFilter{
@@ -37,8 +40,21 @@ class ParticleFilter{
         tf2_ros::Buffer buffer_;
         tf2_ros::TransformListener listener_;
         tf2_ros::TransformBroadcaster broadcaster_;
+        thread submap_thread_;
 
-        
+        GridMap3D grid_submap_;
+        queue<Eigen::Matrix4d> submap_flag_queue_;
+        condition_variable submap_cv_;
+        mutex submap_mtx_;
+
+        mutex kill_mtx_;
+        condition_variable kill_cv_;
+        bool kill_flag_, kill_done_;
+
+
+        void submapFlagCallback();
+
+        void waitForKill();
 
         void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud);
 

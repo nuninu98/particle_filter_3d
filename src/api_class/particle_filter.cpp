@@ -1,17 +1,48 @@
 #include <particle_filter_3d/api_class/particle_filter.h>
 
 ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()),
-tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_){
+tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false){
     nh_.setCallbackQueue(&queue_);
     particles_.resize(N_particles_, Particle());
+    grid_submap_.initialize(100.0, 100.0, 40.0, 0.1);
     sub_lidar_ = nh_.subscribe("lidar_topic", 1, &ParticleFilter::lidarCallback, this);
     sub_odometry_ = nh_.subscribe("odom_topic", 1, &ParticleFilter::odomCallback, this);
-    spinner_.start();
+    submap_thread_ = thread(&ParticleFilter::submapFlagCallback, this);
+    submap_thread_.detach();
     //buffer_.lookupTransform("base_link", "velodyne", ros::Time(0));
+    spinner_.start();
 }
 
 ParticleFilter::~ParticleFilter(){  
     spinner_.stop();
+    kill_flag_ = true;
+    submap_cv_.notify_all();
+    waitForKill();
+}
+
+void ParticleFilter::waitForKill(){
+    while(true){
+        unique_lock<mutex> lock(kill_mtx_);
+        kill_cv_.wait(lock, [this]{return kill_done_;});
+        if(kill_done_){
+            return;
+        }
+    }
+}
+
+void ParticleFilter::submapFlagCallback(){
+    while(true){
+        unique_lock<mutex> lock(submap_mtx_);
+        submap_cv_.wait(lock, [this]{return !submap_flag_queue_.empty() || kill_flag_;});
+        if(kill_flag_){
+            kill_done_ = true;
+            kill_cv_.notify_all();
+            return;
+        }
+        
+    }
+    
+    
 }
 
 void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
@@ -20,6 +51,7 @@ void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud
     pcl::PointCloud<pcl::PointXYZI> raw_lidar, lidar_robot;
     pcl::fromROSMsg(*cloud, raw_lidar);
     pcl::transformPointCloud(raw_lidar, lidar_robot, tf_lidar2_robot_);
+
     //===================================================================
 }
 

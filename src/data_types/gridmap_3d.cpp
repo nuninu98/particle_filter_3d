@@ -12,15 +12,16 @@ int GridMap3D::toIndex(int xid, int yid, int zid){
     return xid + yid * x_grids_ + zid * (x_grids_*y_grids_);
 }
 
-void GridMap3D::initialize(double x_size, double y_size_, double z_size_, double resolution){
+void GridMap3D::initialize(double x_size, double y_size, double z_size, double resolution){
     resolution_ = resolution;
     x_grids_ = x_size / resolution;
-    y_grids_ = y_size_ / resolution;
-    z_grids_ = z_grids_ / resolution;
+    y_grids_ = y_size / resolution;
+    z_grids_ = z_size / resolution;
     occupied_.resize(x_grids_ * y_grids_ * z_grids_, false);
 }
 
 void GridMap3D::generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose){
+    occupied_.resize(x_grids_ * y_grids_ * z_grids_, false);
     Eigen::Vector3d tvec = robot_pose.block<3, 1>(0, 3);
     double x_size = resolution_ * x_grids_;
     double y_size = resolution_ * y_grids_;
