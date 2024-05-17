@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="particle_filter_3d" name="test_gicp_localization" type="test_gicp_localization" output="screen">
+        <rosparam command="load" file="$(find particle_filter_3d)/param/config.yaml" />
+    </node>
+</launch>

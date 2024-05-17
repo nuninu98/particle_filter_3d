@@ -147,11 +147,28 @@ target_link_libraries(particle_filter_api
   particle_filter_datatype_lib 
 )
 
+add_library(gicp_localization_api
+  src/api_class/gicp_localization.cpp
+)
+add_dependencies(gicp_localization_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(gicp_localization_api
+  ${catkin_LIBRARIES}
+  ${PCL_LIBRARIES} 
+)
+
+
 add_executable(test_particle_filter src/test_node/test_particle_filter.cpp)
 add_dependencies(test_particle_filter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(test_particle_filter
   ${catkin_LIBRARIES}
   particle_filter_api
+)
+
+add_executable(test_gicp_localization src/test_node/test_gicp_localization.cpp)
+add_dependencies(test_gicp_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_gicp_localization
+  ${catkin_LIBRARIES}
+  gicp_localization_api
 )
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
