@@ -9,6 +9,7 @@
 #include <ros/spinner.h>
 #include <omp.h>
 #include <sensor_msgs/PointCloud2.h>
+#include <visualization_msgs/MarkerArray.h>
 #include <nav_msgs/Odometry.h>
 #include <mutex>
 #include <random>
@@ -50,7 +51,12 @@ class ParticleFilter{
         mutex kill_mtx_;
         condition_variable kill_cv_;
         bool kill_flag_, kill_done_;
+        pcl::PointCloud<pcl::PointXYZI> pcd_map_;
+        nav_msgs::Odometry last_odom_;
 
+        ros::Publisher pub_map_;
+        ros::Publisher pub_particles_;
+        ros::ServiceServer server_;
 
         void submapFlagCallback();
 
@@ -67,6 +73,13 @@ class ParticleFilter{
         Eigen::Matrix4d toSE3(const Eigen::VectorXd& pose6d);
 
         void calculatePose(); // calculate average
+
+        void publishMap();
+
+        void publishParticle();
+
+        void addSubmapFlag(const Eigen::Matrix4d& pose);
+
     public:
         ParticleFilter();
 

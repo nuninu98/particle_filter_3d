@@ -13,12 +13,12 @@ Particle::~Particle(){
 }
 
 void Particle::predict(const Eigen::Matrix4d& motion_gap){
-
+    pose_ = pose_ * motion_gap;
 }
 
 
 double Particle::getWeight() const{
-
+    return weight_;
 }
 
 void Particle::setWeight(const double& weight){
