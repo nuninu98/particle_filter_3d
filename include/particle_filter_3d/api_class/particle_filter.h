@@ -16,14 +16,13 @@
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
 #include <tf2_ros/transform_broadcaster.h>
-#include <pcl_conversions/pcl_conversions.h>
-#include <pcl/conversions.h>
 #include <pcl/filters/voxel_grid.h>
-#include <pcl/common/transforms.h>
 #include <pcl/io/pcd_io.h>
 #include <thread>
 #include <condition_variable>
 #include <queue>
+#include <geometry_msgs/PoseWithCovarianceStamped.h>
+
 using namespace std;
 
 class ParticleFilter{
@@ -47,6 +46,7 @@ class ParticleFilter{
         queue<Eigen::Matrix4d> submap_flag_queue_;
         condition_variable submap_cv_;
         mutex submap_mtx_;
+        Eigen::Matrix4d submap_updated_pose_;
 
         mutex kill_mtx_;
         condition_variable kill_cv_;
@@ -56,7 +56,13 @@ class ParticleFilter{
 
         ros::Publisher pub_map_;
         ros::Publisher pub_particles_;
-        ros::ServiceServer server_;
+
+        pcl::VoxelGrid<pcl::PointXYZI> voxel_;
+
+        ros::Subscriber sub_initpose_;
+        ros::Time last_tf_stamp_;
+
+        bool is_moving_;
 
         void submapFlagCallback();
 
@@ -80,6 +86,7 @@ class ParticleFilter{
 
         void addSubmapFlag(const Eigen::Matrix4d& pose);
 
+        void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose_2d);
     public:
         ParticleFilter();
 

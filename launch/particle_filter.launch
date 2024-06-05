@@ -1,4 +1,5 @@
 <launch>
+    <param name="use_sim_time" value="true"/>
     <node pkg="particle_filter_3d" name="test_particle_filter" type="test_particle_filter" output="screen">
         <rosparam command="load" file="$(find particle_filter_3d)/param/config.yaml" />
     </node>

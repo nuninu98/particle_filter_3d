@@ -6,6 +6,10 @@
 #include <Eigen/Dense>
 #include <Eigen/Core>
 #include <particle_filter_3d/data_types/particle.h>
+#include <pcl_conversions/pcl_conversions.h>
+#include <pcl/conversions.h>
+#include <pcl/common/transforms.h>
+
 using namespace std;
 class GridMap3D{
     private:

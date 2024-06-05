@@ -9,6 +9,8 @@ class Particle{
     public:
         Particle();
 
+        Particle(const Particle& p);
+
         Particle(const Eigen::Matrix4d& pose);
 
         ~Particle();

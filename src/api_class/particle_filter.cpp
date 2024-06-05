@@ -1,7 +1,7 @@
 #include <particle_filter_3d/api_class/particle_filter.h>
 
 ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()),
-tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false){
+tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), is_moving_(false){
     nh_.setCallbackQueue(&queue_);
     particles_.resize(N_particles_, Particle());
     grid_submap_.initialize(100.0, 100.0, 40.0, 0.1);
@@ -24,25 +24,13 @@ tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(fa
     submap_thread_ = thread(&ParticleFilter::submapFlagCallback, this);
     submap_thread_.detach();
     last_odom_.header.stamp = ros::Time(0.0);
+    last_tf_stamp_ = ros::Time(0.0);
     tf_lidar2_robot_(2, 3) = 0.4; 
-    // geometry_msgs::TransformStamped robot2Lidar;
-    // bool got_tf = true;
-    // while(true){
-    //     try
-    //     {
-    //         robot2Lidar = buffer_.lookupTransform("base_link", "velodyne", ros::Time(0));
-    //     }
-    //     catch(const std::exception& e)
-    //     {
-    //         got_tf = false;
-    //         std::cerr << e.what() << '\n';
-    //     }
-    //     if(got_tf){
-    //         cout<<"GOT: "<<robot2Lidar.transform.translation.z<<endl;
 
-    //         break;
-    //     }
-    // }
+    sub_initpose_ = nh_.subscribe("initialpose", 1, &ParticleFilter::initialPoseCallback, this);
+
+    voxel_.setLeafSize(0.3, 0.3, 0.3);
+    initialize(Eigen::Matrix4d::Identity());
     
     
     spinner_.start();
@@ -90,10 +78,64 @@ void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud
         return;
     }
     //========================Particle Estimation========================
-    pcl::PointCloud<pcl::PointXYZI> raw_lidar, lidar_robot;
+    // if(!is_moving_){
+    //     return;
+    // }
+    pcl::PointCloud<pcl::PointXYZI> raw_lidar;
+    pcl::PointCloud<pcl::PointXYZI>::Ptr lidar_robot(new pcl::PointCloud<pcl::PointXYZI>());
     pcl::fromROSMsg(*cloud, raw_lidar);
-    pcl::transformPointCloud(raw_lidar, lidar_robot, tf_lidar2_robot_);
+    pcl::transformPointCloud(raw_lidar, *lidar_robot, tf_lidar2_robot_);
+    voxel_.setInputCloud(lidar_robot);
+    voxel_.filter(*lidar_robot);
 
+    submap_mtx_.lock();
+    for(size_t i = 0; i < N_particles_; ++i){
+        grid_submap_.updateScore(*lidar_robot, particles_[i]);
+    }
+    double weigth_sum = 0.0;
+    for(size_t i = 0; i < N_particles_; ++i){
+        double w = particles_[i].getWeight();
+        weigth_sum += w;
+    }
+    for(size_t i = 0; i < N_particles_; ++i){
+        double w = particles_[i].getWeight();
+        particles_[i].setWeight(w/ weigth_sum);
+    }
+    Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
+    submap_mtx_.unlock();
+    vector<double> prefix_sum;
+    for(size_t i = 0; i < N_particles_; ++i){
+        if(i == 0){
+            prefix_sum.push_back(particles_[i].getWeight());
+        }
+        else{
+            prefix_sum.push_back(prefix_sum.back() + particles_[i].getWeight());
+        }
+    }
+    double point = (double)rand() / (double)RAND_MAX;
+    int particle_id = 0;
+    double step = 1.0 / N_particles_;
+    vector<Particle> new_particles;
+    for(int i = 0; i < N_particles_; ++i){
+        if(point >= 1.0){
+            point -= 1.0;
+            particle_id = 0;
+        }
+        while(prefix_sum[particle_id] < point){
+            particle_id++;
+        }
+        Particle p(particles_[particle_id]);
+        p.setWeight(1.0 / N_particles_);
+        new_particles.push_back(p);
+        point += step;        
+    }
+    particles_ = new_particles;
+    publishParticle();
+    calculatePose();
+    Eigen::Matrix4d from_submap_update = last_submap_pose.inverse() * pose_;
+    if(from_submap_update.block<3, 1>(0, 3).norm() > 10.0){
+        addSubmapFlag(pose_);
+    }
     //===================================================================
 }
 
@@ -105,26 +147,27 @@ void ParticleFilter::odomCallback(const nav_msgs::OdometryConstPtr& odom){
     //=============================Particle Prediction=====================
     if(last_odom_.header.stamp == ros::Time(0.0)){
         last_odom_ = *odom;
-        
         return;
     }
     Eigen::Vector3d linvel(odom->twist.twist.linear.x, odom->twist.twist.linear.y, odom->twist.twist.linear.z);
     Eigen::Vector3d angvel(odom->twist.twist.angular.x, odom->twist.twist.angular.y, odom->twist.twist.angular.z);
-    if(linvel.norm() < 0.01 && angvel.norm() < 0.01){
-        publishParticle();
-        last_odom_ = *odom;
-        return;
-    }
+    // if(linvel.norm() < 0.01 && angvel.norm() < 0.01){
+    //     publishParticle();
+    //     last_odom_ = *odom;
+    //     is_moving_ = false;
+    //     return;
+    // }
+    is_moving_ = true;
     ros::Time begin = ros::Time::now();
     double dt = (odom->header.stamp - last_odom_.header.stamp).toSec();
     random_device rd;
     mt19937 gen(rd());
-    normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 0.1);
-    normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.05);
+    normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 1.5* pow(odom->twist.twist.linear.x, 2));
+    normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.1);
     normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.05);
     normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.05);
     normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.05);
-    normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 0.05);
+    normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 1.0* pow(odom->twist.twist.angular.z, 2));
     for(auto& p : particles_){
         Eigen::VectorXd dp = Eigen::VectorXd::Zero(6);
         dp(0) = nd_vx(gen) * dt;
@@ -179,9 +222,9 @@ void ParticleFilter::initialize(const Eigen::Matrix4d& pose){
     
     random_device rd;
     mt19937 gen(rd());
-    normal_distribution<double> nd_x(0.0, 0.3);
-    normal_distribution<double> nd_y(0.0, 0.3);
-    normal_distribution<double> nd_z(0.0, 0.3);
+    normal_distribution<double> nd_x(0.0, 0.05);
+    normal_distribution<double> nd_y(0.0, 0.05);
+    normal_distribution<double> nd_z(0.0, 0.05);
     normal_distribution<double> nd_rx(0.0, 0.1);
     normal_distribution<double> nd_ry(0.0, 0.1);
     normal_distribution<double> nd_rz(0.0, 0.1);
@@ -211,6 +254,7 @@ void ParticleFilter::calculatePose(){
         Eigen::Quaterniond q(pose.block<3, 3>(0, 0));
         Eigen::Vector4d q_vec(q.x(), q.y(), q.z(), q.w());
         Q.col(i) = q_vec;
+        pose_avg = pose_avg + (pose.block<3, 1>(0, 3) / N_particles_); 
     }
     Eigen::MatrixXd QQT = Q * Q.transpose();
     Eigen::JacobiSVD<Eigen::Matrix4d> svd(QQT, Eigen::ComputeFullU | Eigen::ComputeFullV);
@@ -220,28 +264,32 @@ void ParticleFilter::calculatePose(){
     pose_(0, 3) = pose_avg(0);
     pose_(1, 3) = pose_avg(1);
     pose_(2, 3) = pose_avg(2);
-
     //================Send TF=================
-    geometry_msgs::TransformStamped tf_msg;
-    tf_msg.header.stamp = ros::Time::now();
-    tf_msg.header.frame_id = "map";
-    tf_msg.child_frame_id = "odom";
-    Eigen::Matrix4d odom_se3 = Eigen::Matrix4d::Identity();
-    odom_se3(0, 3) = last_odom_.pose.pose.position.x;
-    odom_se3(1, 3) = last_odom_.pose.pose.position.y;
-    odom_se3(2, 3) = last_odom_.pose.pose.position.z;
-    Eigen::Quaterniond odom_q(last_odom_.pose.pose.orientation.w, last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y, last_odom_.pose.pose.orientation.z);
-    odom_se3.block<3, 3>(0, 0) = odom_q.toRotationMatrix();
-    Eigen::Matrix4d map2odom = pose_ * odom_se3.inverse();
-    tf_msg.transform.translation.x = map2odom(0, 3);
-    tf_msg.transform.translation.y = map2odom(1, 3);
-    tf_msg.transform.translation.z = map2odom(2, 3);
-    Eigen::Quaterniond diff_q(map2odom.block<3, 3>(0, 0));
-    tf_msg.transform.rotation.w = diff_q.w();
-    tf_msg.transform.rotation.x = diff_q.x();
-    tf_msg.transform.rotation.y = diff_q.y();
-    tf_msg.transform.rotation.z = diff_q.z();
-    broadcaster_.sendTransform(tf_msg);
+    ros::Time stamp = ros::Time::now();
+    if((stamp - last_tf_stamp_).toSec() > 0.001){
+        geometry_msgs::TransformStamped tf_msg;
+        tf_msg.header.stamp = stamp;
+        tf_msg.header.frame_id = "map";
+        tf_msg.child_frame_id = "odom";
+        Eigen::Matrix4d odom_se3 = Eigen::Matrix4d::Identity();
+        odom_se3(0, 3) = last_odom_.pose.pose.position.x;
+        odom_se3(1, 3) = last_odom_.pose.pose.position.y;
+        odom_se3(2, 3) = last_odom_.pose.pose.position.z;
+        Eigen::Quaterniond odom_q(last_odom_.pose.pose.orientation.w, last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y, last_odom_.pose.pose.orientation.z);
+        odom_se3.block<3, 3>(0, 0) = odom_q.toRotationMatrix();
+        Eigen::Matrix4d map2odom = pose_ * odom_se3.inverse();
+        tf_msg.transform.translation.x = map2odom(0, 3);
+        tf_msg.transform.translation.y = map2odom(1, 3);
+        tf_msg.transform.translation.z = map2odom(2, 3);
+        Eigen::Quaterniond diff_q(map2odom.block<3, 3>(0, 0));
+        tf_msg.transform.rotation.w = diff_q.w();
+        tf_msg.transform.rotation.x = diff_q.x();
+        tf_msg.transform.rotation.y = diff_q.y();
+        tf_msg.transform.rotation.z = diff_q.z();
+        broadcaster_.sendTransform(tf_msg);
+        last_tf_stamp_ = stamp;
+    }
+    
     //================================================
 }
 
@@ -288,6 +336,17 @@ void ParticleFilter::publishParticle(){
 void ParticleFilter::addSubmapFlag(const Eigen::Matrix4d& pose){
     unique_lock<mutex> lock(submap_mtx_);
     submap_flag_queue_.push(pose);
+    submap_updated_pose_ = pose;
     submap_cv_.notify_all();
 }
 
+void ParticleFilter::initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose_2d){
+    Eigen::Matrix4d pose_se3 = Eigen::Matrix4d::Identity();
+    pose_se3(0, 3) = pose_2d->pose.pose.position.x;
+    pose_se3(1, 3) = pose_2d->pose.pose.position.y;
+    pose_se3(2, 3) = 0.0;
+
+    Eigen::Quaterniond q(pose_2d->pose.pose.orientation.w, pose_2d->pose.pose.orientation.x, pose_2d->pose.pose.orientation.y, pose_2d->pose.pose.orientation.z);
+    pose_se3.block<3, 3>(0, 0) = q.toRotationMatrix();
+    initialize(pose_se3);
+}

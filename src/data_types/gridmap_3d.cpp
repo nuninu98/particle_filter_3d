@@ -42,5 +42,25 @@ void GridMap3D::generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, c
 }
 
 void GridMap3D::updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p){
-    
+    pcl::PointCloud<pcl::PointXYZI> tf_cloud;
+    pcl::transformPointCloud(robot_tf_lidar, tf_cloud, p.getPose());
+    int weight = 0.0;
+    #pragma omp parallel for
+    for(size_t i = 0; i < tf_cloud.size(); ++i){
+        int xid = (tf_cloud[i].x - origin_(0))/resolution_;
+        int yid = (tf_cloud[i].y - origin_(1))/resolution_;
+        int zid = (tf_cloud[i].z - origin_(2))/resolution_;
+        if(xid < 0 || xid >= x_grids_ || yid < 0 || yid >= y_grids_ || zid < 0 || zid >= z_grids_){
+            continue;
+        }
+        int id = toIndex(xid, yid, zid);
+        if(id >= occupied_.size()){
+            continue;
+        }
+        if(occupied_[id]){
+            #pragma omp atomic
+            weight += 1.0;
+        }
+    }
+    p.setWeight(weight);
 }   
