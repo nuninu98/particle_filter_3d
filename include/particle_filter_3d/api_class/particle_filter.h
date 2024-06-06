@@ -62,7 +62,11 @@ class ParticleFilter{
         ros::Subscriber sub_initpose_;
         ros::Time last_tf_stamp_;
 
+        ros::Publisher pub_pose_;
+
         bool is_moving_;
+
+        bool pub_odom_tf_;
 
         void submapFlagCallback();
 

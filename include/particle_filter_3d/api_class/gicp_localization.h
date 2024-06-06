@@ -61,6 +61,9 @@ class GicpLocalization{
         ros::Publisher pub_target_;
         tf2_ros::TransformBroadcaster broadcaster_;
 
+        ros::Publisher pub_pose_;
+        bool pub_odom_tf_;
+
         pcl::GeneralizedIterativeClosestPoint<pcl::PointXYZI, pcl::PointXYZI> gicp_;
 
         void odomCallback(const nav_msgs::OdometryConstPtr& odom);

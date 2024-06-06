@@ -18,6 +18,8 @@ tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(fa
     pnh_.param<string>("map_file", map_file_path, "odometry/filtered");
     pcl::io::loadPCDFile(map_file_path, pcd_map_);
 
+    pnh_.param<bool>("publish_odom_tf", pub_odom_tf_, false);    
+
     pub_map_ = nh_.advertise<sensor_msgs::PointCloud2>("pcd_map", 1);
     pub_particles_ = nh_.advertise<visualization_msgs::MarkerArray>("particles", 1);
     
@@ -32,6 +34,7 @@ tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(fa
     voxel_.setLeafSize(0.3, 0.3, 0.3);
     initialize(Eigen::Matrix4d::Identity());
     
+    pub_pose_ = nh_.advertise<nav_msgs::Odometry>("localization_pose", 1);
     
     spinner_.start();
 }
@@ -136,6 +139,20 @@ void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud
     if(from_submap_update.block<3, 1>(0, 3).norm() > 10.0){
         addSubmapFlag(pose_);
     }
+
+    nav_msgs::Odometry odom_msg;
+    odom_msg.header.frame_id = "map";
+    odom_msg.header.stamp = ros::Time::now();
+    odom_msg.pose.pose.position.x = pose_(0, 3);
+    odom_msg.pose.pose.position.y = pose_(1, 3);
+    odom_msg.pose.pose.position.z = pose_(2, 3);
+
+    Eigen::Quaterniond pose_quat(pose_.block<3, 3>(0, 0));
+    odom_msg.pose.pose.orientation.w = pose_quat.w();
+    odom_msg.pose.pose.orientation.x = pose_quat.x();
+    odom_msg.pose.pose.orientation.y = pose_quat.y();
+    odom_msg.pose.pose.orientation.z = pose_quat.z();
+    pub_pose_.publish(odom_msg);
     //===================================================================
 }
 
@@ -162,12 +179,12 @@ void ParticleFilter::odomCallback(const nav_msgs::OdometryConstPtr& odom){
     double dt = (odom->header.stamp - last_odom_.header.stamp).toSec();
     random_device rd;
     mt19937 gen(rd());
-    normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 1.5* pow(odom->twist.twist.linear.x, 2));
-    normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.1);
-    normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.05);
-    normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.05);
-    normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.05);
-    normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 1.0* pow(odom->twist.twist.angular.z, 2));
+    normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 1.0* pow(odom->twist.twist.linear.x, 2));
+    normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.02);
+    normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.02);
+    normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.01);
+    normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.01);
+    normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 0.5* pow(odom->twist.twist.angular.z, 2));
     for(auto& p : particles_){
         Eigen::VectorXd dp = Eigen::VectorXd::Zero(6);
         dp(0) = nd_vx(gen) * dt;
@@ -267,6 +284,7 @@ void ParticleFilter::calculatePose(){
     //================Send TF=================
     ros::Time stamp = ros::Time::now();
     if((stamp - last_tf_stamp_).toSec() > 0.001){
+        vector<geometry_msgs::TransformStamped> tfs;
         geometry_msgs::TransformStamped tf_msg;
         tf_msg.header.stamp = stamp;
         tf_msg.header.frame_id = "map";
@@ -286,7 +304,19 @@ void ParticleFilter::calculatePose(){
         tf_msg.transform.rotation.x = diff_q.x();
         tf_msg.transform.rotation.y = diff_q.y();
         tf_msg.transform.rotation.z = diff_q.z();
-        broadcaster_.sendTransform(tf_msg);
+        tfs.push_back(tf_msg);
+        if(pub_odom_tf_){
+            geometry_msgs::TransformStamped tf_odom;
+            tf_odom.header.stamp = stamp;
+            tf_odom.header.frame_id = "odom";
+            tf_odom.child_frame_id = "base_link";
+            tf_odom.transform.translation.x = last_odom_.pose.pose.position.x;
+            tf_odom.transform.translation.y = last_odom_.pose.pose.position.y; 
+            tf_odom.transform.translation.z = last_odom_.pose.pose.position.z; 
+            tf_odom.transform.rotation = last_odom_.pose.pose.orientation;
+            tfs.push_back(tf_odom);
+        }
+        broadcaster_.sendTransform(tfs);
         last_tf_stamp_ = stamp;
     }
     

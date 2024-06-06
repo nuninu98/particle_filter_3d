@@ -14,6 +14,8 @@ GicpLocalization::GicpLocalization(): queue_(), pnh_("~"), spinner_(0, &queue_),
 
     string map_file_path = "";
     pnh_.param<string>("map_file", map_file_path, "empty");
+
+    pnh_.param<bool>("publish_odom_tf", pub_odom_tf_, false);  
     
     pub_map_ = nh_.advertise<sensor_msgs::PointCloud2>("gicp_map", 1);
     pub_query_ = nh_.advertise<sensor_msgs::PointCloud2>("gicp_query", 1);
@@ -32,6 +34,8 @@ GicpLocalization::GicpLocalization(): queue_(), pnh_("~"), spinner_(0, &queue_),
     addSubmapFlag(pose_);
 
     tf_lidar_robot_(2, 3) = 0.4;
+
+    pub_pose_ = nh_.advertise<nav_msgs::Odometry>("localization_pose", 1);
 
     gicp_.setMaxCorrespondenceDistance(1.0);
     gicp_.setTransformationEpsilon(0.01);
@@ -87,8 +91,11 @@ Eigen::Matrix4d GicpLocalization::odom2SE3(const nav_msgs::Odometry& odom){
 }
 
 void GicpLocalization::pubPoseTF(){
+    ros::Time stamp = ros::Time::now();
+    vector<geometry_msgs::TransformStamped> tfs;
+
     geometry_msgs::TransformStamped map2odom_tf;
-    map2odom_tf.header.stamp = ros::Time::now();
+    map2odom_tf.header.stamp = stamp;
     map2odom_tf.header.frame_id = "map";
     map2odom_tf.child_frame_id = "odom";
     Eigen::Matrix4d odom_se3 = odom2SE3(last_odom_);
@@ -103,8 +110,21 @@ void GicpLocalization::pubPoseTF(){
     map2odom_tf.transform.rotation.x = q.x();
     map2odom_tf.transform.rotation.y = q.y();
     map2odom_tf.transform.rotation.z = q.z();
+    tfs.push_back(map2odom_tf);
 
-    broadcaster_.sendTransform(map2odom_tf);
+    if(pub_odom_tf_){
+        geometry_msgs::TransformStamped tf_odom;
+        tf_odom.header.stamp = stamp;
+        tf_odom.header.frame_id = "odom";
+        tf_odom.child_frame_id = "base_link";
+        tf_odom.transform.translation.x = last_odom_.pose.pose.position.x;
+        tf_odom.transform.translation.y = last_odom_.pose.pose.position.y; 
+        tf_odom.transform.translation.z = last_odom_.pose.pose.position.z; 
+        tf_odom.transform.rotation = last_odom_.pose.pose.orientation;
+        tfs.push_back(tf_odom);
+    }
+
+    broadcaster_.sendTransform(tfs);
 }
 
 void GicpLocalization::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
@@ -132,6 +152,20 @@ void GicpLocalization::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& clo
     pose_ = gicp_.getFinalTransformation().cast<double>();
     pose_mtx_.unlock();
     //cout<<"TIME: "<<(ros::Time::now() - tic).toSec()<<endl;
+
+    nav_msgs::Odometry odom_msg;
+    odom_msg.header.frame_id = "map";
+    odom_msg.header.stamp = ros::Time::now();
+    odom_msg.pose.pose.position.x = pose_(0, 3);
+    odom_msg.pose.pose.position.y = pose_(1, 3);
+    odom_msg.pose.pose.position.z = pose_(2, 3);
+
+    Eigen::Quaterniond pose_quat(pose_.block<3, 3>(0, 0));
+    odom_msg.pose.pose.orientation.w = pose_quat.w();
+    odom_msg.pose.pose.orientation.x = pose_quat.x();
+    odom_msg.pose.pose.orientation.y = pose_quat.y();
+    odom_msg.pose.pose.orientation.z = pose_quat.z();
+    pub_pose_.publish(odom_msg);
 }
 
 void GicpLocalization::addSubmapFlag(const Eigen::Matrix4d& pose){
