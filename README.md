@@ -35,8 +35,7 @@ The command below can run the localization.
 roslaunch particle_filter_3d particle_filter.launch
 ```
 Experiment result is posted as the paper:
-https://github.com/nuninu98/particle_filter_3d/blob/main/Dynamic%20Environment%20Robust%203D%20LiDAR%20Based%20Monte%20Carlo%20Localization.pdf
-
+[Dynamic Environment Robust 3D LiDAR Based Monte Carlo Localization.pdf](https://github.com/user-attachments/files/15924770/Dynamic.Environment.Robust.3D.LiDAR.Based.Monte.Carlo.Localization.pdf)
 
 Demo GIF
-<img src="https://github.com/nuninu98/particle_filter_3d/issues/1#issue-2365952409">
+![particle filter](https://github.com/nuninu98/particle_filter_3d/assets/36870891/81c6ba3e-2962-4cfb-a360-70ef27d6d3da)
