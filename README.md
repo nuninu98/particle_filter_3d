@@ -9,7 +9,14 @@ This package provides 3D LiDAR based Monte Carlo Localization algorithm. It trac
 3. Eigen >= 3.3
 4. Point cloud map (.pcd)
 
-## Intallation
+## Install
+```
+cd ~/catkin_ws/src
+
+git clone https://github.com/nuninu98/particle_filter_3d.git
+
+cd ~/catkin_ws && catkin_make
+```
 
 ## ROS API
 ### Subscribe
@@ -29,7 +36,7 @@ The algorithm setting can be modified in param/config.yaml file.
 - publish_odom_tf: If true, odom -> baselink tf is generated
 - num_partices: Particle numbers
 
-## Demo and experiment
+## Demo and Experiment
 The command below can run the localization. 
 ```
 roslaunch particle_filter_3d particle_filter.launch
