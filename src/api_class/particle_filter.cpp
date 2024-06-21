@@ -6,6 +6,8 @@ tf_lidar2_robot_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(fa
     particles_.resize(N_particles_, Particle());
     grid_submap_.initialize(100.0, 100.0, 40.0, 0.1);
     
+    pnh_.param<size_t>("num_particles", N_particles_, 1000);
+
     string lidar_topic = "";
     pnh_.param<string>("lidar_topic", lidar_topic, "velodyne_points");
     sub_lidar_ = nh_.subscribe(lidar_topic, 1, &ParticleFilter::lidarCallback, this);

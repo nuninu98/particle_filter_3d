@@ -2,3 +2,4 @@ lidar_topic: /velodyne_points
 odom_topic: /odometry/filtered #/jackal_velocity_controller/odom
 map_file: "/home/nuninu98/Downloads/LOAM/GlobalMap.pcd"
 publish_odom_tf: true
+num_particles: 1000
