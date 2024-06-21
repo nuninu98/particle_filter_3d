@@ -39,4 +39,4 @@ https://github.com/nuninu98/particle_filter_3d/blob/main/Dynamic%20Environment%2
 
 
 Demo GIF
-https://github.com/nuninu98/particle_filter_3d/blob/main/particle_filter_opt.gif
+<img src="https://github.com/nuninu98/particle_filter_3d/issues/1#issue-2365952409">
