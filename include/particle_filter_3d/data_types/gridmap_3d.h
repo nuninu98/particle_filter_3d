@@ -11,24 +11,26 @@
 #include <pcl/common/transforms.h>
 
 using namespace std;
-class GridMap3D{
-    private:
-        Eigen::Vector3d origin_;
-        vector<bool> occupied_;
-        double resolution_;
-        size_t x_grids_, y_grids_, z_grids_;
+namespace PARTICLE_FILTER_3D{
+    class GridMap3D{
+        private:
+            Eigen::Vector3d origin_;
+            vector<bool> occupied_;
+            double resolution_;
+            size_t x_grids_, y_grids_, z_grids_;
 
-        int toIndex(int xid, int yid, int zid);
-    public:
-        GridMap3D();
+            int toIndex(int xid, int yid, int zid);
+        public:
+            GridMap3D();
 
-        ~GridMap3D();
+            ~GridMap3D();
 
-        void initialize(double x_size, double y_size, double z_size, double resolution);
+            void initialize(double x_size, double y_size, double z_size, double resolution);
 
-        void generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose);
+            void generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose);
 
-        void updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p);
-};
+            void updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p);
+    };
+}
 
 #endif

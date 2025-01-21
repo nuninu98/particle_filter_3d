@@ -15,10 +15,11 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   tf2_ros
   pcl_conversions
+  gtsam_quadrics
 )
 find_package(PCL 1.8 REQUIRED)
 find_package (Eigen3 3.3 REQUIRED NO_MODULE)
-
+find_package(GTSAM REQUIRED QUIET)
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -124,18 +125,22 @@ catkin_package(
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${GTSAM_INCLUDE_DIR}
 )
 
 ## Declare a C++ library
 add_library(particle_filter_datatype_lib
   src/data_types/particle.cpp
   src/data_types/gridmap_3d.cpp
+  src/data_types/object.cpp
 )
 add_dependencies(particle_filter_datatype_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(particle_filter_datatype_lib
   ${catkin_LIBRARIES}
   Eigen3::Eigen
-  ${PCL_LIBRARIES} 
+  ${PCL_LIBRARIES}
+  gtsam
+  gtsam_quadrics 
 )
 
 add_library(particle_filter_api

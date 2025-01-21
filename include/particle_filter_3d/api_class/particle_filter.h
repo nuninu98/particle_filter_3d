@@ -3,6 +3,7 @@
 
 #include <particle_filter_3d/data_types/particle.h>
 #include <particle_filter_3d/data_types/gridmap_3d.h>
+#include <particle_filter_3d/data_types/object.h>
 #include <vector>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
@@ -22,81 +23,89 @@
 #include <condition_variable>
 #include <queue>
 #include <geometry_msgs/PoseWithCovarianceStamped.h>
+#include <fstream>
+#include <string>
+#include <visualization_msgs/MarkerArray.h>
 
 using namespace std;
+namespace PARTICLE_FILTER_3D{
+    class ParticleFilter{
+        private:
+            ros::CallbackQueue queue_;
+            ros::AsyncSpinner spinner_;
+            vector<Particle> particles_;
+            size_t N_particles_;
+            ros::NodeHandle nh_, pnh_;
+            ros::Subscriber sub_odometry_;
+            ros::Subscriber sub_lidar_;
+            Eigen::Matrix4d pose_;
+            Eigen::Matrix4d tf_lidar2_robot_;
 
-class ParticleFilter{
-    private:
-        ros::CallbackQueue queue_;
-        ros::AsyncSpinner spinner_;
-        vector<Particle> particles_;
-        size_t N_particles_;
-        ros::NodeHandle nh_, pnh_;
-        ros::Subscriber sub_odometry_;
-        ros::Subscriber sub_lidar_;
-        Eigen::Matrix4d pose_;
-        Eigen::Matrix4d tf_lidar2_robot_;
+            tf2_ros::Buffer buffer_;
+            tf2_ros::TransformListener listener_;
+            tf2_ros::TransformBroadcaster broadcaster_;
+            thread submap_thread_;
 
-        tf2_ros::Buffer buffer_;
-        tf2_ros::TransformListener listener_;
-        tf2_ros::TransformBroadcaster broadcaster_;
-        thread submap_thread_;
+            GridMap3D grid_submap_;
+            queue<Eigen::Matrix4d> submap_flag_queue_;
+            condition_variable submap_cv_;
+            mutex submap_mtx_;
+            Eigen::Matrix4d submap_updated_pose_;
 
-        GridMap3D grid_submap_;
-        queue<Eigen::Matrix4d> submap_flag_queue_;
-        condition_variable submap_cv_;
-        mutex submap_mtx_;
-        Eigen::Matrix4d submap_updated_pose_;
+            mutex kill_mtx_;
+            condition_variable kill_cv_;
+            bool kill_flag_, kill_done_;
+            pcl::PointCloud<pcl::PointXYZI> pcd_map_;
+            vector<shared_ptr<Object>> objects_;
+            nav_msgs::Odometry last_odom_;
 
-        mutex kill_mtx_;
-        condition_variable kill_cv_;
-        bool kill_flag_, kill_done_;
-        pcl::PointCloud<pcl::PointXYZI> pcd_map_;
-        nav_msgs::Odometry last_odom_;
+            ros::Publisher pub_map_;
+            ros::Publisher pub_particles_;
+            ros::Publisher pub_map_objects_;
 
-        ros::Publisher pub_map_;
-        ros::Publisher pub_particles_;
+            pcl::VoxelGrid<pcl::PointXYZI> voxel_;
 
-        pcl::VoxelGrid<pcl::PointXYZI> voxel_;
+            ros::Subscriber sub_initpose_;
+            ros::Time last_tf_stamp_;
 
-        ros::Subscriber sub_initpose_;
-        ros::Time last_tf_stamp_;
+            ros::Publisher pub_pose_;
 
-        ros::Publisher pub_pose_;
+            bool is_moving_;
 
-        bool is_moving_;
+            bool pub_odom_tf_;
 
-        bool pub_odom_tf_;
+            void submapFlagCallback();
 
-        void submapFlagCallback();
+            void waitForKill();
 
-        void waitForKill();
+            void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud);
 
-        void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud);
+            void odomCallback(const nav_msgs::OdometryConstPtr& odom);
+            
+            mutex mtx_;
 
-        void odomCallback(const nav_msgs::OdometryConstPtr& odom);
-        
-        mutex mtx_;
+            Eigen::VectorXd toPose6d(const Eigen::Matrix4d& se3);
 
-        Eigen::VectorXd toPose6d(const Eigen::Matrix4d& se3);
+            Eigen::Matrix4d toSE3(const Eigen::VectorXd& pose6d);
 
-        Eigen::Matrix4d toSE3(const Eigen::VectorXd& pose6d);
+            void calculatePose(); // calculate average
 
-        void calculatePose(); // calculate average
+            void publishMap();
 
-        void publishMap();
+            void publishParticle();
 
-        void publishParticle();
+            void addSubmapFlag(const Eigen::Matrix4d& pose);
 
-        void addSubmapFlag(const Eigen::Matrix4d& pose);
+            void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose_2d);
 
-        void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose_2d);
-    public:
-        ParticleFilter();
+            bool loadObjectMap(const string& path);
 
-        ~ParticleFilter();
+        public:
+            ParticleFilter();
 
-        void initialize(const Eigen::Matrix4d& pose);
-};
+            ~ParticleFilter();
 
+            void initialize(const Eigen::Matrix4d& pose);
+    };
+}
 #endif
