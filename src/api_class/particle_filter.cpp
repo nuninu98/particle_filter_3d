@@ -96,16 +96,20 @@ namespace PARTICLE_FILTER_3D{
         // if(!is_moving_){
         //     return;
         // }
+        ros::Time begin = ros::Time::now();
         pcl::PointCloud<pcl::PointXYZI> raw_lidar;
         pcl::PointCloud<pcl::PointXYZI>::Ptr lidar_robot(new pcl::PointCloud<pcl::PointXYZI>());
+        pcl::PointCloud<pcl::PointXYZI> lidar_robot_ds;
         pcl::fromROSMsg(*cloud, raw_lidar);
         pcl::transformPointCloud(raw_lidar, *lidar_robot, tf_lidar2_robot_);
-        voxel_.setInputCloud(lidar_robot);
-        voxel_.filter(*lidar_robot);
-
+        
+        PARTICLE_FILTER_3D::voxelize(lidar_robot, lidar_robot_ds, 0.3);
+        
+        //voxel_.setInputCloud(lidar_robot);
+        //voxel_.filter(*lidar_robot);
         submap_mtx_.lock();
         for(size_t i = 0; i < N_particles_; ++i){
-            grid_submap_.updateScore(*lidar_robot, particles_[i]);
+            grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
         }
         double weigth_sum = 0.0;
         for(size_t i = 0; i < N_particles_; ++i){
@@ -118,6 +122,7 @@ namespace PARTICLE_FILTER_3D{
         }
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
         submap_mtx_.unlock();
+        
         vector<double> prefix_sum;
         for(size_t i = 0; i < N_particles_; ++i){
             if(i == 0){
@@ -144,14 +149,19 @@ namespace PARTICLE_FILTER_3D{
             new_particles.push_back(p);
             point += step;        
         }
+        
         particles_ = new_particles;
+        // particles_.clear();
+        // for(const auto& p : new_particles){
+        //     particles_.push_back(p);
+        // }
+        
         publishParticle();
         calculatePose();
         Eigen::Matrix4d from_submap_update = last_submap_pose.inverse() * pose_;
         if(from_submap_update.block<3, 1>(0, 3).norm() > 10.0){
             addSubmapFlag(pose_);
         }
-
         nav_msgs::Odometry odom_msg;
         odom_msg.header.frame_id = "map";
         odom_msg.header.stamp = ros::Time::now();
@@ -451,7 +461,6 @@ namespace PARTICLE_FILTER_3D{
                 str_left = str_left.substr(id + 1);
                 splitted.push_back(split);
             }
-            cout<<splitted.size()<<endl;
             if(splitted.size() != 11){
                 return false;
             }

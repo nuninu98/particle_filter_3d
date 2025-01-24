@@ -29,7 +29,23 @@
 
 using namespace std;
 namespace PARTICLE_FILTER_3D{
+
+    void voxelize(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_in, pcl::PointCloud<pcl::PointXYZI>& cloud_out, double leaf_size){
+        pcl::PCLPointCloud2Ptr cloud(new pcl::PCLPointCloud2());
+        pcl::toPCLPointCloud2(*cloud_in, *cloud);
+
+        pcl::PCLPointCloud2Ptr cloud_ds(new pcl::PCLPointCloud2());
+        pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
+        vox.setInputCloud(cloud);
+        vox.setLeafSize(leaf_size, leaf_size, leaf_size);
+        vox.filter(*cloud_ds);
+        pcl::fromPCLPointCloud2(*cloud_ds, cloud_out);
+    }
+
     class ParticleFilter{
+        public:
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+            
         private:
             ros::CallbackQueue queue_;
             ros::AsyncSpinner spinner_;

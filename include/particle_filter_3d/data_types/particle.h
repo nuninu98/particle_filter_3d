@@ -2,8 +2,12 @@
 #define __MORIN_PARTICLE_FILTER_PARTICLE_H__
 #include <Eigen/Dense>
 #include <Eigen/Core>
+#include <iostream>
+#include <Eigen/StdVector>
 namespace PARTICLE_FILTER_3D{
     class Particle{
+        public:
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
             Eigen::Matrix4d pose_;
             double weight_;
@@ -23,6 +27,8 @@ namespace PARTICLE_FILTER_3D{
             void setWeight(const double& weight);
 
             Eigen::Matrix4d getPose() const;
+
+            Particle& operator=(const Particle& p);
     };
 }
 

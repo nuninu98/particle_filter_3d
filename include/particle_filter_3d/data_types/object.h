@@ -5,6 +5,8 @@
 using namespace std;
 namespace PARTICLE_FILTER_3D{
     class Object{
+        public:
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
             string name_;
             gtsam_quadrics::ConstrainedDualQuadric Q_;

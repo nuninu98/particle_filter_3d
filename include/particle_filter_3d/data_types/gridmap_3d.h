@@ -13,6 +13,8 @@
 using namespace std;
 namespace PARTICLE_FILTER_3D{
     class GridMap3D{
+        public:
+            EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
             Eigen::Vector3d origin_;
             vector<bool> occupied_;
