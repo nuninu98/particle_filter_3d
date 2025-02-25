@@ -111,49 +111,53 @@ namespace PARTICLE_FILTER_3D{
         
         //voxel_.setInputCloud(lidar_robot);
         //voxel_.filter(*lidar_robot);
-        submap_mtx_.lock();
-        for(size_t i = 0; i < N_particles_; ++i){
-            grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
-        }
-        double weigth_sum = 0.0;
-        for(size_t i = 0; i < N_particles_; ++i){
-            double w = particles_[i].getWeight();
-            weigth_sum += w;
-        }
-        for(size_t i = 0; i < N_particles_; ++i){
-            double w = particles_[i].getWeight();
-            particles_[i].setWeight(w/ weigth_sum);
-        }
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
-        submap_mtx_.unlock();
+        for(int cnt = 0; cnt < 3; cnt++){
+            submap_mtx_.lock();
+            for(size_t i = 0; i < N_particles_; ++i){
+                grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
+            }
+            double weigth_sum = 0.0;
+            for(size_t i = 0; i < N_particles_; ++i){
+                double w = particles_[i].getWeight();
+                weigth_sum += w;
+            }
+            for(size_t i = 0; i < N_particles_; ++i){
+                double w = particles_[i].getWeight();
+                particles_[i].setWeight(w/ weigth_sum);
+            }
+            
+            submap_mtx_.unlock();
+            
+            vector<double> prefix_sum;
+            for(size_t i = 0; i < N_particles_; ++i){
+                if(i == 0){
+                    prefix_sum.push_back(particles_[i].getWeight());
+                }
+                else{
+                    prefix_sum.push_back(prefix_sum.back() + particles_[i].getWeight());
+                }
+            }
+            double point = (double)rand() / (double)RAND_MAX;
+            int particle_id = 0;
+            double step = 1.0 / N_particles_;
+            vector<Particle> new_particles;
+            for(int i = 0; i < N_particles_; ++i){
+                if(point >= 1.0){
+                    point -= 1.0;
+                    particle_id = 0;
+                }
+                while(prefix_sum[particle_id] < point){
+                    particle_id++;
+                }
+                Particle p(particles_[particle_id]);
+                p.setWeight(1.0 / N_particles_);
+                new_particles.push_back(p);
+                point += step;        
+            }
+            particles_ = new_particles;
+        }
         
-        vector<double> prefix_sum;
-        for(size_t i = 0; i < N_particles_; ++i){
-            if(i == 0){
-                prefix_sum.push_back(particles_[i].getWeight());
-            }
-            else{
-                prefix_sum.push_back(prefix_sum.back() + particles_[i].getWeight());
-            }
-        }
-        double point = (double)rand() / (double)RAND_MAX;
-        int particle_id = 0;
-        double step = 1.0 / N_particles_;
-        vector<Particle> new_particles;
-        for(int i = 0; i < N_particles_; ++i){
-            if(point >= 1.0){
-                point -= 1.0;
-                particle_id = 0;
-            }
-            while(prefix_sum[particle_id] < point){
-                particle_id++;
-            }
-            Particle p(particles_[particle_id]);
-            p.setWeight(1.0 / N_particles_);
-            new_particles.push_back(p);
-            point += step;        
-        }
-        particles_ = new_particles;
         
         publishParticle();
         calculatePose();
@@ -177,7 +181,7 @@ namespace PARTICLE_FILTER_3D{
         //===================================================================
     
         //====Preintegration Flag====
-        if(cloud->header.stamp.toSec() > last_flag_stamp + 1.5){
+        //if(cloud->header.stamp.toSec() > last_flag_stamp + 1.5){
             nav_msgs::Odometry flag;
             flag.header.frame_id = "map";
             flag.header.stamp = cloud->header.stamp;
@@ -185,7 +189,8 @@ namespace PARTICLE_FILTER_3D{
             flag.pose.pose.orientation = odom_msg.pose.pose.orientation;
             pub_preintegration_flag_.publish(flag);
             last_flag_stamp = cloud->header.stamp.toSec();
-        }
+            
+        //}
         
     }
 
@@ -208,20 +213,13 @@ namespace PARTICLE_FILTER_3D{
         double dt = (odom->header.stamp - last_odom_.header.stamp).toSec();
         random_device rd;
         mt19937 gen(rd());
-        
-        // normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 2.0* pow(odom->twist.twist.linear.x, 2));
-        // normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.02);
-        // normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.02);
-        // normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.01);
-        // normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.01);
-        // normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 3.0* pow(odom->twist.twist.angular.z, 2));
 
-        normal_distribution<double> nd_vx(0.0,  2.0* pow(odom->twist.twist.linear.x, 2));
-        normal_distribution<double> nd_vy(0.0,  0.1);
-        normal_distribution<double> nd_vz(0.0,  0.1);
-        normal_distribution<double> nd_wx(0.0, 5.0* pow(odom->twist.twist.angular.x, 2));
-        normal_distribution<double> nd_wy(0.0, 5.0* pow(odom->twist.twist.angular.y, 2));
-        normal_distribution<double> nd_wz(0.0, 5.0* pow(odom->twist.twist.angular.z, 2));
+        normal_distribution<double> nd_vx(0.0,  3.0* abs(odom->twist.twist.linear.x));
+        normal_distribution<double> nd_vy(0.0,  3.0* abs(odom->twist.twist.linear.y));
+        normal_distribution<double> nd_vz(0.0,  3.0* abs(odom->twist.twist.linear.z));
+        normal_distribution<double> nd_wx(0.0, 2.0* abs(odom->twist.twist.angular.x));
+        normal_distribution<double> nd_wy(0.0, 2.0* abs(odom->twist.twist.angular.y));
+        normal_distribution<double> nd_wz(0.0, 2.0* abs(odom->twist.twist.angular.z));
         gtsam::Pose3 P_odomprev(gtsam::Rot3::Quaternion(last_odom_.pose.pose.orientation.w, last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y, last_odom_.pose.pose.orientation.z), 
                                 gtsam::Point3(last_odom_.pose.pose.position.x, last_odom_.pose.pose.position.y, last_odom_.pose.pose.position.z));
         
@@ -237,7 +235,7 @@ namespace PARTICLE_FILTER_3D{
             // dp(4) = nd_wy(gen) * dt;
             // dp(5) = nd_wz(gen) * dt;
             Eigen::VectorXd dp = Eigen::VectorXd::Zero(6);
-            if(odom->header.stamp.toSec() > initOdomStamp_ + 60.0){
+            if(odom->header.stamp.toSec() > initOdomStamp_){
                 ROS_INFO_ONCE("INIT!");
                 dp = toPose6d(dP.matrix());
             }

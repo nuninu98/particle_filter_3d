@@ -215,7 +215,6 @@ namespace PARTICLE_FILTER_3D{
         gtsam::Values result = optimizer_.calculateEstimate();
         prevPose_  = result.at<gtsam::Pose3>(X(key_));
         prevVel_   = result.at<gtsam::Vector3>(V(key_));
-        //prevState_ = propState;
         prevState_ = gtsam::NavState(prevPose_, prevVel_);
         prevBias_  = result.at<gtsam::imuBias::ConstantBias>(B(key_));
         // Reset the optimization preintegration object.
@@ -226,14 +225,19 @@ namespace PARTICLE_FILTER_3D{
         //IMU Odometry bias setting
         prevStateOdom_ = prevState_;
         prevBiasOdom_ = prevBias_;
-        imuIntegratorImu_->resetIntegrationAndSetBias(prevBiasOdom_);
+        
         // first pop imu message older than current correction data
         double lastImuQT = -1;
+        bool bias_updated = false;
         while (!imuQueImu_.empty())
         {
             sensor_msgs::Imu imu_data = imuQueImu_.front();
             double imuTime = imuQueImu_.front().header.stamp.toSec();
             if(imuTime > currentCorrectionTime){
+                if(!bias_updated){
+                    imuIntegratorImu_->resetIntegrationAndSetBias(prevBiasOdom_);
+                    bias_updated = true;
+                }
                 double dt = (lastImuQT < 0) ? (1.0 / 500.0) :(imuTime - lastImuQT);
                 imuIntegratorImu_->integrateMeasurement(gtsam::Vector3(imu_data.linear_acceleration.x, imu_data.linear_acceleration.y, imu_data.linear_acceleration.z),
                                                         gtsam::Vector3(imu_data.angular_velocity.x, imu_data.angular_velocity.y, imu_data.angular_velocity.z), dt);

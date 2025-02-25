@@ -62,6 +62,6 @@ namespace PARTICLE_FILTER_3D{
                 weight += 1.0;
             }
         }
-        p.setWeight(weight);
+        p.setWeight(weight*weight);
     }   
 }
