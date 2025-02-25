@@ -1,5 +1,5 @@
 lidar_topic: /velodyne_points
-odom_topic: /jackal_velocity_controller/odom
+odom_topic: imu_odom #/jackal_velocity_controller/odom
 map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/GlobalMap.pcd"
 object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
 publish_odom_tf: true

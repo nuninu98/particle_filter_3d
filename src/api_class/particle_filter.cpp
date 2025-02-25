@@ -48,6 +48,8 @@ namespace PARTICLE_FILTER_3D{
         
         pub_pose_ = nh_.advertise<nav_msgs::Odometry>("localization_pose", 1);
         pub_map_objects_ = nh_.advertise<visualization_msgs::MarkerArray>("map_objects", 1);
+        
+        pub_preintegration_flag_ = nh_.advertise<nav_msgs::Odometry>("preintegration_flag", 1);
         spinner_.start();
     }
 
@@ -87,11 +89,13 @@ namespace PARTICLE_FILTER_3D{
         
     }
 
+    double last_flag_stamp = -1;
     void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
         unique_lock<mutex> lock(mtx_);
         if(pcd_map_.empty()){
             return;
         }
+
         //========================Particle Estimation========================
         // if(!is_moving_){
         //     return;
@@ -149,12 +153,7 @@ namespace PARTICLE_FILTER_3D{
             new_particles.push_back(p);
             point += step;        
         }
-        
         particles_ = new_particles;
-        // particles_.clear();
-        // for(const auto& p : new_particles){
-        //     particles_.push_back(p);
-        // }
         
         publishParticle();
         calculatePose();
@@ -164,7 +163,7 @@ namespace PARTICLE_FILTER_3D{
         }
         nav_msgs::Odometry odom_msg;
         odom_msg.header.frame_id = "map";
-        odom_msg.header.stamp = ros::Time::now();
+        odom_msg.header.stamp = cloud->header.stamp;
         odom_msg.pose.pose.position.x = pose_(0, 3);
         odom_msg.pose.pose.position.y = pose_(1, 3);
         odom_msg.pose.pose.position.z = pose_(2, 3);
@@ -176,46 +175,80 @@ namespace PARTICLE_FILTER_3D{
         odom_msg.pose.pose.orientation.z = pose_quat.z();
         pub_pose_.publish(odom_msg);
         //===================================================================
+    
+        //====Preintegration Flag====
+        if(cloud->header.stamp.toSec() > last_flag_stamp + 1.5){
+            nav_msgs::Odometry flag;
+            flag.header.frame_id = "map";
+            flag.header.stamp = cloud->header.stamp;
+            flag.pose.pose.position = odom_msg.pose.pose.position;
+            flag.pose.pose.orientation = odom_msg.pose.pose.orientation;
+            pub_preintegration_flag_.publish(flag);
+            last_flag_stamp = cloud->header.stamp.toSec();
+        }
+        
     }
 
     void ParticleFilter::odomCallback(const nav_msgs::OdometryConstPtr& odom){
         unique_lock<mutex> lock(mtx_);
-        if(pcd_map_.empty()){
-            return;
-        }
+        
         //=============================Particle Prediction=====================
         if(last_odom_.header.stamp == ros::Time(0.0)){
             last_odom_ = *odom;
+            initOdomStamp_ = odom->header.stamp.toSec();
             return;
         }
-        Eigen::Vector3d linvel(odom->twist.twist.linear.x, odom->twist.twist.linear.y, odom->twist.twist.linear.z);
-        Eigen::Vector3d angvel(odom->twist.twist.angular.x, odom->twist.twist.angular.y, odom->twist.twist.angular.z);
-        // if(linvel.norm() < 0.01 && angvel.norm() < 0.01){
-        //     publishParticle();
-        //     last_odom_ = *odom;
-        //     is_moving_ = false;
-        //     return;
-        // }
+        
+        if(pcd_map_.empty()){
+            last_odom_ = *odom;
+            return;
+        }
         is_moving_ = true;
         ros::Time begin = ros::Time::now();
         double dt = (odom->header.stamp - last_odom_.header.stamp).toSec();
         random_device rd;
         mt19937 gen(rd());
-        normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 2.0* pow(odom->twist.twist.linear.x, 2));
-        normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.02);
-        normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.02);
-        normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.01);
-        normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.01);
-        normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 3.0* pow(odom->twist.twist.angular.z, 2));
+        
+        // normal_distribution<double> nd_vx(odom->twist.twist.linear.x, 2.0* pow(odom->twist.twist.linear.x, 2));
+        // normal_distribution<double> nd_vy(odom->twist.twist.linear.y, 0.02);
+        // normal_distribution<double> nd_vz(odom->twist.twist.linear.z, 0.02);
+        // normal_distribution<double> nd_wx(odom->twist.twist.angular.x, 0.01);
+        // normal_distribution<double> nd_wy(odom->twist.twist.angular.y, 0.01);
+        // normal_distribution<double> nd_wz(odom->twist.twist.angular.z, 3.0* pow(odom->twist.twist.angular.z, 2));
+
+        normal_distribution<double> nd_vx(0.0,  2.0* pow(odom->twist.twist.linear.x, 2));
+        normal_distribution<double> nd_vy(0.0,  0.1);
+        normal_distribution<double> nd_vz(0.0,  0.1);
+        normal_distribution<double> nd_wx(0.0, 5.0* pow(odom->twist.twist.angular.x, 2));
+        normal_distribution<double> nd_wy(0.0, 5.0* pow(odom->twist.twist.angular.y, 2));
+        normal_distribution<double> nd_wz(0.0, 5.0* pow(odom->twist.twist.angular.z, 2));
+        gtsam::Pose3 P_odomprev(gtsam::Rot3::Quaternion(last_odom_.pose.pose.orientation.w, last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y, last_odom_.pose.pose.orientation.z), 
+                                gtsam::Point3(last_odom_.pose.pose.position.x, last_odom_.pose.pose.position.y, last_odom_.pose.pose.position.z));
+        
+        gtsam::Pose3 P_odomcurr(gtsam::Rot3::Quaternion(odom->pose.pose.orientation.w, odom->pose.pose.orientation.x, odom->pose.pose.orientation.y, odom->pose.pose.orientation.z), 
+                                gtsam::Point3(odom->pose.pose.position.x, odom->pose.pose.position.y, odom->pose.pose.position.z));
+        gtsam::Pose3 dP = P_odomprev.inverse() * P_odomcurr;
         for(auto& p : particles_){
+            //Eigen::VectorXd dp = Eigen::VectorXd::Zero(6);
+            // dp(0) = nd_vx(gen) * dt;
+            // dp(1) = nd_vy(gen) * dt;
+            // dp(2) = nd_vz(gen) * dt;
+            // dp(3) = nd_wx(gen) * dt;
+            // dp(4) = nd_wy(gen) * dt;
+            // dp(5) = nd_wz(gen) * dt;
             Eigen::VectorXd dp = Eigen::VectorXd::Zero(6);
-            dp(0) = nd_vx(gen) * dt;
-            dp(1) = nd_vy(gen) * dt;
-            dp(2) = nd_vz(gen) * dt;
-            dp(3) = nd_wx(gen) * dt;
-            dp(4) = nd_wy(gen) * dt;
-            dp(5) = nd_wz(gen) * dt;
+            if(odom->header.stamp.toSec() > initOdomStamp_ + 60.0){
+                ROS_INFO_ONCE("INIT!");
+                dp = toPose6d(dP.matrix());
+            }
+            dp(0) += nd_vx(gen) * dt;
+            dp(1) += nd_vy(gen) * dt;
+            dp(2) += nd_vz(gen) * dt;
+            dp(3) += nd_wx(gen) * dt;
+            dp(4) += nd_wy(gen) * dt;
+            dp(5) += nd_wz(gen) * dt;
             p.predict(toSE3(dp));
+        
         }
         publishParticle();
         calculatePose();
@@ -304,6 +337,9 @@ namespace PARTICLE_FILTER_3D{
         pose_(1, 3) = pose_avg(1);
         pose_(2, 3) = pose_avg(2);
         //================Send TF=================
+        if(last_odom_.header.stamp == ros::Time(0.0)){
+            return;
+        }
         ros::Time stamp = ros::Time::now();
         if((stamp - last_tf_stamp_).toSec() > 0.001){
             vector<geometry_msgs::TransformStamped> tfs;

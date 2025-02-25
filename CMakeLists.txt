@@ -42,6 +42,9 @@ find_package(catkin REQUIRED COMPONENTS
 find_package(PCL 1.10 REQUIRED)
 find_package (Eigen3 3.3 REQUIRED)
 find_package(GTSAM REQUIRED QUIET)
+find_package(Boost REQUIRED COMPONENTS timer)
+find_package(OpenMP REQUIRED)
+
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 
@@ -168,35 +171,40 @@ target_link_libraries(particle_filter_datatype_lib
 add_library(particle_filter_api
   src/api_class/particle_filter.cpp
 )
+target_compile_options(particle_filter_api PRIVATE ${OpenMP_CXX_FLAGS})
 add_dependencies(particle_filter_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(particle_filter_api
   ${catkin_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
+  Boost::timer
   particle_filter_datatype_lib 
 )
 
-add_library(gicp_localization_api
-  src/api_class/gicp_localization.cpp
-)
-add_dependencies(gicp_localization_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(gicp_localization_api
-  ${catkin_LIBRARIES}
-  ${PCL_LIBRARIES} 
-)
 
+add_library(imu_preintegration_api
+  src/api_class/imu_preintegration.cpp
+)
+target_compile_options(imu_preintegration_api PRIVATE ${OpenMP_CXX_FLAGS})
+add_dependencies(imu_preintegration_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(imu_preintegration_api
+  ${catkin_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
+  Boost::timer
+  gtsam
+)
 
 add_executable(test_particle_filter src/test_node/test_particle_filter.cpp)
 add_dependencies(test_particle_filter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_compile_options(test_particle_filter PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(test_particle_filter
   ${catkin_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
+  Boost::timer
   particle_filter_api
+  imu_preintegration_api
 )
 
-add_executable(test_gicp_localization src/test_node/test_gicp_localization.cpp)
-add_dependencies(test_gicp_localization ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(test_gicp_localization
-  ${catkin_LIBRARIES}
-  gicp_localization_api
-)
+
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure

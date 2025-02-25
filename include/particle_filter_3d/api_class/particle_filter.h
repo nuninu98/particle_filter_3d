@@ -26,6 +26,7 @@
 #include <fstream>
 #include <string>
 #include <visualization_msgs/MarkerArray.h>
+#include <geometry_msgs/PoseStamped.h>
 
 using namespace std;
 namespace PARTICLE_FILTER_3D{
@@ -78,6 +79,7 @@ namespace PARTICLE_FILTER_3D{
             ros::Publisher pub_map_;
             ros::Publisher pub_particles_;
             ros::Publisher pub_map_objects_;
+            ros::Publisher pub_preintegration_flag_;
 
             pcl::VoxelGrid<pcl::PointXYZI> voxel_;
 
@@ -116,6 +118,7 @@ namespace PARTICLE_FILTER_3D{
 
             bool loadObjectMap(const string& path);
 
+            double initOdomStamp_ = -1;
         public:
             ParticleFilter();
 
