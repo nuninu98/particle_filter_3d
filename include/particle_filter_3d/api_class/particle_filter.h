@@ -27,27 +27,31 @@
 #include <string>
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseStamped.h>
+#include <particle_filter_3d/api_class/imu_preintegration.h>
 
 using namespace std;
 namespace PARTICLE_FILTER_3D{
 
-    void voxelize(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_in, pcl::PointCloud<pcl::PointXYZI>& cloud_out, double leaf_size){
-        pcl::PCLPointCloud2Ptr cloud(new pcl::PCLPointCloud2());
-        pcl::toPCLPointCloud2(*cloud_in, *cloud);
-
-        pcl::PCLPointCloud2Ptr cloud_ds(new pcl::PCLPointCloud2());
-        pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
-        vox.setInputCloud(cloud);
-        vox.setLeafSize(leaf_size, leaf_size, leaf_size);
-        vox.filter(*cloud_ds);
-        pcl::fromPCLPointCloud2(*cloud_ds, cloud_out);
-    }
+    
 
     class ParticleFilter{
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
             
         private:
+
+            void voxelize(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_in, pcl::PointCloud<pcl::PointXYZI>& cloud_out, double leaf_size){
+                pcl::PCLPointCloud2Ptr cloud(new pcl::PCLPointCloud2());
+                pcl::toPCLPointCloud2(*cloud_in, *cloud);
+
+                pcl::PCLPointCloud2Ptr cloud_ds(new pcl::PCLPointCloud2());
+                pcl::VoxelGrid<pcl::PCLPointCloud2> vox;
+                vox.setInputCloud(cloud);
+                vox.setLeafSize(leaf_size, leaf_size, leaf_size);
+                vox.filter(*cloud_ds);
+                pcl::fromPCLPointCloud2(*cloud_ds, cloud_out);
+            }
+            
             ros::CallbackQueue queue_;
             ros::AsyncSpinner spinner_;
             vector<Particle> particles_;
@@ -79,7 +83,6 @@ namespace PARTICLE_FILTER_3D{
             ros::Publisher pub_map_;
             ros::Publisher pub_particles_;
             ros::Publisher pub_map_objects_;
-            ros::Publisher pub_preintegration_flag_;
 
             pcl::VoxelGrid<pcl::PointXYZI> voxel_;
 
@@ -88,7 +91,6 @@ namespace PARTICLE_FILTER_3D{
 
             ros::Publisher pub_pose_;
 
-            bool is_moving_;
 
             bool pub_odom_tf_;
 
@@ -119,7 +121,13 @@ namespace PARTICLE_FILTER_3D{
             bool loadObjectMap(const string& path);
 
             double initOdomStamp_ = -1;
+
+            IMUPreintegration* ip_ = nullptr;
+        
+            double alpha_v_;
+            double alpha_w_;
         public:
+
             ParticleFilter();
 
             ~ParticleFilter();

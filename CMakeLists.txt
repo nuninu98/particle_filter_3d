@@ -154,7 +154,7 @@ include_directories(
 )
 
 ## Declare a C++ library
-add_library(particle_filter_datatype_lib
+add_library(particle_filter_datatype_lib STATIC
   src/data_types/particle.cpp
   src/data_types/gridmap_3d.cpp
   src/data_types/object.cpp
@@ -168,20 +168,7 @@ target_link_libraries(particle_filter_datatype_lib
   gtsam_quadrics 
 )
 
-add_library(particle_filter_api
-  src/api_class/particle_filter.cpp
-)
-target_compile_options(particle_filter_api PRIVATE ${OpenMP_CXX_FLAGS})
-add_dependencies(particle_filter_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(particle_filter_api
-  ${catkin_LIBRARIES}
-  ${OpenMP_CXX_FLAGS}
-  Boost::timer
-  particle_filter_datatype_lib 
-)
-
-
-add_library(imu_preintegration_api
+add_library(imu_preintegration_api STATIC
   src/api_class/imu_preintegration.cpp
 )
 target_compile_options(imu_preintegration_api PRIVATE ${OpenMP_CXX_FLAGS})
@@ -193,6 +180,22 @@ target_link_libraries(imu_preintegration_api
   gtsam
 )
 
+add_library(particle_filter_api STATIC
+  src/api_class/particle_filter.cpp
+)
+target_compile_options(particle_filter_api PRIVATE ${OpenMP_CXX_FLAGS})
+add_dependencies(particle_filter_api ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(particle_filter_api
+  ${catkin_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
+  Boost::timer
+  particle_filter_datatype_lib
+  imu_preintegration_api 
+)
+
+
+
+
 add_executable(test_particle_filter src/test_node/test_particle_filter.cpp)
 add_dependencies(test_particle_filter ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_options(test_particle_filter PRIVATE ${OpenMP_CXX_FLAGS})
@@ -201,7 +204,7 @@ target_link_libraries(test_particle_filter
   ${OpenMP_CXX_FLAGS}
   Boost::timer
   particle_filter_api
-  imu_preintegration_api
+  
 )
 
 

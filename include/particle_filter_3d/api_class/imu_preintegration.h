@@ -43,7 +43,6 @@ namespace PARTICLE_FILTER_3D{
             ros::CallbackQueue queue_;
             ros::AsyncSpinner spinner_;
             ros::Subscriber sub_imu_;
-            ros::Subscriber sub_preintegration_flag_;
 
             ros::Publisher pub_imu_odom_;
 
@@ -82,11 +81,15 @@ namespace PARTICLE_FILTER_3D{
 
             void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 
-            void flagCallback(const nav_msgs::OdometryConstPtr& stamped_pose);
+            bool getPreintegratedOdom(const sensor_msgs::Imu& imu_data, nav_msgs::Odometry& imu_odom);
         public:
             IMUPreintegration();
 
+            void optimWithPose(const Eigen::Matrix4d& robot_pose, double currentCorrectionTime);
+
             ~IMUPreintegration();
+
+            void reset();
     };
 }
 
