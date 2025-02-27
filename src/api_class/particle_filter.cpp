@@ -478,10 +478,6 @@ namespace PARTICLE_FILTER_3D{
         Eigen::Quaterniond q(pose_2d->pose.pose.orientation.w, pose_2d->pose.pose.orientation.x, pose_2d->pose.pose.orientation.y, pose_2d->pose.pose.orientation.z);
         pose_se3.block<3, 3>(0, 0) = q.toRotationMatrix();
         initialize(pose_se3);
-        // if(ip_ != nullptr){
-        //     ip_->reset();
-        //     last_odom_.header.stamp = ros::Time(0.0);
-        // }
     }
 
     bool ParticleFilter::loadObjectMap(const string& path){ // name x y z qw qx qy qz rx ry tz
