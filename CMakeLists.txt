@@ -38,12 +38,15 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   pcl_conversions
   gtsam_quadrics
+  yolo_protocol
+  cv_bridge
 )
 find_package(PCL 1.10 REQUIRED)
 find_package (Eigen3 3.3 REQUIRED)
 find_package(GTSAM REQUIRED QUIET)
 find_package(Boost REQUIRED COMPONENTS timer)
 find_package(OpenMP REQUIRED)
+find_package(OpenCV 4.7.0 REQUIRED)
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -151,6 +154,7 @@ include_directories(
   include
   ${catkin_INCLUDE_DIRS}
   ${GTSAM_INCLUDE_DIR}
+  ${OpenCV_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
@@ -160,10 +164,12 @@ add_library(particle_filter_datatype_lib STATIC
   src/data_types/object.cpp
 )
 add_dependencies(particle_filter_datatype_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_compile_options(particle_filter_datatype_lib PRIVATE ${OpenMP_CXX_FLAGS})
 target_link_libraries(particle_filter_datatype_lib
   ${catkin_LIBRARIES}
   Eigen3::Eigen
   ${PCL_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
   gtsam
   gtsam_quadrics 
 )
@@ -190,7 +196,8 @@ target_link_libraries(particle_filter_api
   ${OpenMP_CXX_FLAGS}
   Boost::timer
   particle_filter_datatype_lib
-  imu_preintegration_api 
+  imu_preintegration_api
+  ${OpenCV_LIBS} 
 )
 
 
@@ -204,7 +211,7 @@ target_link_libraries(test_particle_filter
   ${OpenMP_CXX_FLAGS}
   Boost::timer
   particle_filter_api
-  
+  #yolo_protocol
 )
 
 

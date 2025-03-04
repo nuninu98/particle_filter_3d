@@ -12,6 +12,7 @@ namespace PARTICLE_FILTER_3D{
             Eigen::Matrix4d pose_;
             double weight_;
         public:
+            
             Particle();
 
             Particle(const Particle& p);

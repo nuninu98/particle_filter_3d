@@ -4,6 +4,11 @@ namespace PARTICLE_FILTER_3D{
         origin_ = Eigen::Vector3d::Zero();
     }
 
+    GridMap3D::GridMap3D(const GridMap3D& map): origin_(map.origin_), resolution_(map.resolution_),
+    x_grids_(map.x_grids_), y_grids_(map.y_grids_), z_grids_(map.z_grids_){
+        occupied_ = map.occupied_;
+    }
+
     GridMap3D::~GridMap3D(){
 
     }
@@ -45,7 +50,6 @@ namespace PARTICLE_FILTER_3D{
         pcl::PointCloud<pcl::PointXYZI> tf_cloud;
         pcl::transformPointCloud(robot_tf_lidar, tf_cloud, p.getPose());
         int weight = 0.0;
-        #pragma omp parallel for
         for(size_t i = 0; i < tf_cloud.size(); ++i){
             int xid = (tf_cloud[i].x - origin_(0))/resolution_;
             int yid = (tf_cloud[i].y - origin_(1))/resolution_;
@@ -58,10 +62,10 @@ namespace PARTICLE_FILTER_3D{
                 continue;
             }
             if(occupied_[id]){
-                #pragma omp atomic
                 weight += 1.0;
             }
         }
         p.setWeight(weight*weight);
-    }   
+    }
+       
 }

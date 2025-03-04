@@ -28,12 +28,15 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <particle_filter_3d/api_class/imu_preintegration.h>
-
+#include <yolo_protocol/YoloResult.h>
+#include <cv_bridge/cv_bridge.h>
+#include <opencv2/core.hpp>
+#include <opencv2/highgui.hpp>
+#include <opencv2/imgproc.hpp>
+#include <gtsam_quadrics/geometry/QuadricCamera.h>
+#include <Eigen/SVD>
 using namespace std;
 namespace PARTICLE_FILTER_3D{
-
-    
-
     class ParticleFilter{
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
@@ -126,6 +129,19 @@ namespace PARTICLE_FILTER_3D{
         
             double alpha_v_;
             double alpha_w_;
+
+            mutex yolo_lock_;
+            yolo_protocol::YoloResult yolo_result_;
+            ros::Subscriber sub_yolo_;
+            boost::shared_ptr<gtsam::Cal3_S2> K_;
+            Eigen::Matrix4d Trc_;
+            void yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
+
+            void resample();
+
+            void drawEllipse(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose);
+        
+            omp_lock_t omp_lock_;
         public:
 
             ParticleFilter();

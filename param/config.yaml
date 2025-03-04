@@ -9,3 +9,10 @@ imu_preintegration:
   enable: true
   imu_topic: imu/data
 odom_topic: jackal_velocity_controller/odom # if disable the imu_preintegration
+camera:
+  enable: true
+  R: [0.0, 0.0, 1.0,
+    -1.0, 0.0, 0.0,
+    0.0, -1.0, 0.0]
+  t: [0.0, 0.0, 0.5]
+  K: [1056.86751311741, 0.0, 640.5, 0.0, 1056.86751311741, 360.5, 0.0, 0.0, 1.0]

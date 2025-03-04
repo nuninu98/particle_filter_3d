@@ -25,6 +25,8 @@ namespace PARTICLE_FILTER_3D{
         public:
             GridMap3D();
 
+            GridMap3D(const GridMap3D& map);
+
             ~GridMap3D();
 
             void initialize(double x_size, double y_size, double z_size, double resolution);
