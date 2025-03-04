@@ -328,9 +328,9 @@ namespace PARTICLE_FILTER_3D{
         
         random_device rd;
         mt19937 gen(rd());
-        normal_distribution<double> nd_x(0.0, 0.05);
-        normal_distribution<double> nd_y(0.0, 0.05);
-        normal_distribution<double> nd_z(0.0, 0.05);
+        normal_distribution<double> nd_x(0.0, 0.5);
+        normal_distribution<double> nd_y(0.0, 0.5);
+        normal_distribution<double> nd_z(0.0, 0.5);
         normal_distribution<double> nd_rx(0.0, 0.1);
         normal_distribution<double> nd_ry(0.0, 0.1);
         normal_distribution<double> nd_rz(0.0, 0.1);
@@ -568,35 +568,48 @@ namespace PARTICLE_FILTER_3D{
 
     }
 
-    void ParticleFilter::drawEllipse(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose){
+    void ParticleFilter::drawSemanticInfo(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose){
         gtsam_quadrics::QuadricCamera q_cam;
         if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
             return;
         }
         gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
-        Eigen::Matrix3d Conic = dC.matrix().inverse();
-        Eigen::Matrix2d M = Conic.block<2, 2>(0, 0);
-        Eigen::JacobiSVD<Eigen::Matrix2d> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
-        Eigen::Matrix2d U = svd.matrixU();
-        Eigen::Matrix2d S = svd.singularValues().asDiagonal();
-        Eigen::Vector2d d(-Conic(0, 2), -Conic(1, 2));
-        Eigen::Vector2d center = M.inverse() * d;
+        gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
+        cv::Rect bbox_cv(bbox.xmin(), bbox.ymin(), bbox.width(), bbox.height());
+        bbox_cv = bbox_cv & cv::Rect(0, 0, image.cols, image.rows);
+        for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
+            for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
+                gtsam::Point2 p(x, y);
+                if(dC.contains(p)){
+                    image.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);
+                }
+            }
+        }
         
-        Eigen::Vector2d v1(U(0, 0), U(1, 0));
-        double angle = RAD2DEG(atan2(v1(1), v1(0)));
+        cv::rectangle(image, bbox_cv, cv::Scalar(0, 0, 255), 2);
+        // Eigen::Matrix3d Conic = dC.matrix().inverse();
+        // Eigen::Matrix2d M = Conic.block<2, 2>(0, 0);
+        // Eigen::JacobiSVD<Eigen::Matrix2d> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        // Eigen::Matrix2d U = svd.matrixU();
+        // Eigen::Matrix2d S = svd.singularValues().asDiagonal();
+        // Eigen::Vector2d d(-Conic(0, 2), -Conic(1, 2));
+        // Eigen::Vector2d center = M.inverse() * d;
+        
+        // Eigen::Vector2d v1(U(0, 0), U(1, 0));
+        // double angle = RAD2DEG(atan2(v1(1), v1(0)));
 
-        double r1 = sqrt(1.0 / S(0, 0)) / 2;
-        double r2 = sqrt(1.0 / S(1, 1)) / 2;
-        cv::ellipse(image, cv::Point(center(0), center(1)), cv::Size(r1, r2), angle, 0.0, 360.0, cv::Scalar(255, 0, 0));
+        // double r1 = sqrt(1.0 / S(0, 0)) / 2;
+        // double r2 = sqrt(1.0 / S(1, 1)) / 2;
+        // cv::ellipse(image, cv::Point(center(0), center(1)), cv::Size(r1, r2), angle, 0.0, 360.0, cv::Scalar(255, 0, 0));
         
-        //==========TEST=======
-        Eigen::Matrix3d K = K_->K();
-        auto c = dQ.centroid();
-        Eigen::Vector4d w_cent(c(0), c(1), c(2), 1.0);
-        Eigen::Vector4d c_cent = cam_pose.matrix().inverse() * w_cent;
-        Eigen::Vector3d pix = K * Eigen::MatrixXd::Identity(3, 4) * c_cent;
-        pix = pix / pix(2);
-        cv::circle(image, cv::Point(pix(0), pix(1)), 3, cv::Scalar(255, 255, 255));
+        // //==========TEST=======
+        // Eigen::Matrix3d K = K_->K();
+        // auto c = dQ.centroid();
+        // Eigen::Vector4d w_cent(c(0), c(1), c(2), 1.0);
+        // Eigen::Vector4d c_cent = cam_pose.matrix().inverse() * w_cent;
+        // Eigen::Vector3d pix = K * Eigen::MatrixXd::Identity(3, 4) * c_cent;
+        // pix = pix / pix(2);
+        // cv::circle(image, cv::Point(pix(0), pix(1)), 3, cv::Scalar(255, 255, 255));
     }
 
     void ParticleFilter::yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
@@ -624,7 +637,7 @@ namespace PARTICLE_FILTER_3D{
         cv::Mat estimated = image_view.clone();//cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC3);
         for(int i = 0; i < objects_.size(); ++i){
             if(objects_[i]->name() == "person")
-            drawEllipse(estimated, objects_[i]->Q(), cam_pose);
+            drawSemanticInfo(estimated, objects_[i]->Q(), cam_pose);
         }
         cv::imshow("TEST1",image_view);
         cv::imshow("TEST2", estimated);

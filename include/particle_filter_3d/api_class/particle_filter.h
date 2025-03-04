@@ -139,7 +139,7 @@ namespace PARTICLE_FILTER_3D{
 
             void resample();
 
-            void drawEllipse(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose);
+            void drawSemanticInfo(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose);
         
             omp_lock_t omp_lock_;
         public:
