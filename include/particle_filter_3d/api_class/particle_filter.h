@@ -81,6 +81,7 @@ namespace PARTICLE_FILTER_3D{
             bool kill_flag_, kill_done_;
             pcl::PointCloud<pcl::PointXYZI> pcd_map_;
             vector<shared_ptr<Object>> objects_;
+            unordered_map<string, size_t> name_ids_;
             nav_msgs::Odometry last_odom_;
 
             ros::Publisher pub_map_;
@@ -137,11 +138,10 @@ namespace PARTICLE_FILTER_3D{
             Eigen::Matrix4d Trc_;
             void yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
 
-            void resample();
-
-            void drawSemanticInfo(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose);
+            void getEstimatedDualConics(const gtsam::Pose3& cam_pose, vector<pair<string, gtsam_quadrics::DualConic>>& output);
         
             omp_lock_t omp_lock_;
+            
         public:
 
             ParticleFilter();

@@ -86,7 +86,7 @@ namespace PARTICLE_FILTER_3D{
             pnh_.param<vector<double>>("camera/K", K, vector<double>());
             K_.reset(new gtsam::Cal3_S2(K[0], K[4], K[1], K[2], K[5]));
         }
-
+        yolo_result_.header.stamp = ros::Time(0.0);
         omp_init_lock(&omp_lock_);
         spinner_.start();
     }
@@ -129,11 +129,6 @@ namespace PARTICLE_FILTER_3D{
         
     }
 
-    double last_flag_stamp = -1;
-    
-    void ParticleFilter::resample(){
-
-    }
     void ParticleFilter::lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
         unique_lock<mutex> lock(mtx_);
         if(pcd_map_.empty()){
@@ -148,21 +143,17 @@ namespace PARTICLE_FILTER_3D{
         pcl::transformPointCloud(raw_lidar, *lidar_robot, tf_lidar2_robot_);
         
         voxelize(lidar_robot, lidar_robot_ds, 0.3);
-        // lidar_robot_ds = *lidar_robot;
         
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
         double test = 0.0;
         submap_mtx_.lock();
         GridMap3D gm(grid_submap_);
         submap_mtx_.unlock();
+        
         for(int cnt = 0; cnt < 3; cnt++){
             #pragma omp parallel for
             for(size_t i = 0; i < N_particles_; ++i){
-                //omp_set_lock(&omp_lock_);
-                //submap_mtx_.lock();
                 gm.updateScore(lidar_robot_ds, particles_[i]);
-                //submap_mtx_.unlock();
-                //omp_unset_lock(&omp_lock_);
             }
             
             double weigth_sum = 0.0;
@@ -174,7 +165,6 @@ namespace PARTICLE_FILTER_3D{
                 double w = particles_[i].getWeight();
                 particles_[i].setWeight(w/ weigth_sum);
             }
-            
             
             vector<double> prefix_sum;
             for(size_t i = 0; i < N_particles_; ++i){
@@ -204,7 +194,6 @@ namespace PARTICLE_FILTER_3D{
             }
             particles_ = new_particles;
         }
-        
         
         publishParticle();
         calculatePose();
@@ -562,71 +551,76 @@ namespace PARTICLE_FILTER_3D{
             gtsam::Pose3 pose(se3);
             gtsam_quadrics::ConstrainedDualQuadric Q(pose, radii);
             shared_ptr<Object> obj(new Object(name, Q)); 
+            if(name_ids_.find(name) == name_ids_.end()){
+                name_ids_.insert({name, objects_.size()});
+            }
             objects_.push_back(obj);
+            
         }
         return true;
 
     }
 
-    void ParticleFilter::drawSemanticInfo(cv::Mat& image, const gtsam_quadrics::ConstrainedDualQuadric& dQ, const gtsam::Pose3& cam_pose){
+    void ParticleFilter::getEstimatedDualConics(const gtsam::Pose3& cam_pose, vector<pair<string, gtsam_quadrics::DualConic>>& output){
+        output.clear();
         gtsam_quadrics::QuadricCamera q_cam;
-        if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
-            return;
-        }
-        gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
-        gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
-        cv::Rect bbox_cv(bbox.xmin(), bbox.ymin(), bbox.width(), bbox.height());
-        bbox_cv = bbox_cv & cv::Rect(0, 0, image.cols, image.rows);
-        for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
-            for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
-                gtsam::Point2 p(x, y);
-                if(dC.contains(p)){
-                    image.at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);
-                }
+        gtsam_quadrics::AlignedBox2 screen(0, 0, 1280, 720);
+        for(int i = 0; i < objects_.size(); ++i){
+            gtsam_quadrics::ConstrainedDualQuadric dQ = objects_[i]->Q();
+            string name = objects_[i]->name();
+            if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
+                continue;
             }
+            gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
+            gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
+            if(bbox.iou(screen) < 1.0e-4){
+                continue;
+            }
+            output.push_back({name, dC});
         }
-        
-        cv::rectangle(image, bbox_cv, cv::Scalar(0, 0, 255), 2);
-        // Eigen::Matrix3d Conic = dC.matrix().inverse();
-        // Eigen::Matrix2d M = Conic.block<2, 2>(0, 0);
-        // Eigen::JacobiSVD<Eigen::Matrix2d> svd(M, Eigen::ComputeFullU | Eigen::ComputeFullV);
-        // Eigen::Matrix2d U = svd.matrixU();
-        // Eigen::Matrix2d S = svd.singularValues().asDiagonal();
-        // Eigen::Vector2d d(-Conic(0, 2), -Conic(1, 2));
-        // Eigen::Vector2d center = M.inverse() * d;
-        
-        // Eigen::Vector2d v1(U(0, 0), U(1, 0));
-        // double angle = RAD2DEG(atan2(v1(1), v1(0)));
-
-        // double r1 = sqrt(1.0 / S(0, 0)) / 2;
-        // double r2 = sqrt(1.0 / S(1, 1)) / 2;
-        // cv::ellipse(image, cv::Point(center(0), center(1)), cv::Size(r1, r2), angle, 0.0, 360.0, cv::Scalar(255, 0, 0));
-        
-        // //==========TEST=======
-        // Eigen::Matrix3d K = K_->K();
-        // auto c = dQ.centroid();
-        // Eigen::Vector4d w_cent(c(0), c(1), c(2), 1.0);
-        // Eigen::Vector4d c_cent = cam_pose.matrix().inverse() * w_cent;
-        // Eigen::Vector3d pix = K * Eigen::MatrixXd::Identity(3, 4) * c_cent;
-        // pix = pix / pix(2);
-        // cv::circle(image, cv::Point(pix(0), pix(1)), 3, cv::Scalar(255, 255, 255));
+        // if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
+        //     return;
+        // }
+        // gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
+        // gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
+        // cv::Rect bbox_cv(bbox.xmin(), bbox.ymin(), bbox.width(), bbox.height());
+        // bbox_cv = bbox_cv & cv::Rect(0, 0, mask_output.cols, mask_output.rows);
+        // for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
+        //     for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
+        //         gtsam::Point2 p(x, y);
+        //         if(dC.contains(p)){
+        //             mask_output.at<uchar>(y, x) = label;
+        //         }
+        //     }
+        // }
+        // if(debug != nullptr){
+        //     for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
+        //         for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
+        //             gtsam::Point2 p(x, y);
+        //             if(dC.contains(p)){
+        //                 debug->at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);
+        //             }
+        //         }
+        //     }
+        //     cv::rectangle(*debug, bbox_cv, cv::Scalar(0, 0, 255), 2);
+        // }
     }
 
     void ParticleFilter::yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
         yolo_result_ = *yolo_result;
         //========Testing=================
-        sensor_msgs::ImageConstPtr color_img = boost::make_shared<sensor_msgs::Image const>(yolo_result->original);
-        cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
-        cv::Mat image_view = cv_rgb_bridge->image.clone();
-        size_t N_detections = yolo_result->masks.size();
-        vector<cv::Vec3b> colors = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255,0), cv::Vec3b(0, 0, 255) };
-        for(size_t i = 0; i < N_detections; ++i){
-            sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
-            cv_bridge::CvImageConstPtr mask_bridge = cv_bridge::toCvShare(mask_msg, "mono8");
-            cv::Mat mask = mask_bridge->image.clone() > 60;
-            image_view.setTo(colors[i %3], mask);
-        }
-        gtsam::Pose3 cam_pose(pose_ * Trc_);
+        // sensor_msgs::ImageConstPtr color_img = boost::make_shared<sensor_msgs::Image const>(yolo_result->original);
+        // cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
+        // cv::Mat image_view = cv_rgb_bridge->image.clone();
+        // size_t N_detections = yolo_result->masks.size();
+        // vector<cv::Vec3b> colors = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255,0), cv::Vec3b(0, 0, 255) };
+        // for(size_t i = 0; i < N_detections; ++i){
+        //     sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
+        //     cv_bridge::CvImageConstPtr mask_bridge = cv_bridge::toCvShare(mask_msg, "mono8");
+        //     cv::Mat mask = mask_bridge->image.clone() > 60;
+        //     image_view.setTo(colors[i %3], mask);
+        // }
+        // gtsam::Pose3 cam_pose(pose_ * Trc_);
         // sort(objects_.begin(), objects_.end(), [cam_pose](const shared_ptr<Object>& o1, const shared_ptr<Object>& o2){
         //     gtsam::Point3 c1 = o1->Q().centroid();
         //     gtsam::Point3 c2 = o2->Q().centroid();
@@ -634,13 +628,13 @@ namespace PARTICLE_FILTER_3D{
         //     double d2 = cam_pose.range(c2);
         //     return d1 > d2;
         // });
-        cv::Mat estimated = image_view.clone();//cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC3);
-        for(int i = 0; i < objects_.size(); ++i){
-            if(objects_[i]->name() == "person")
-            drawSemanticInfo(estimated, objects_[i]->Q(), cam_pose);
-        }
-        cv::imshow("TEST1",image_view);
-        cv::imshow("TEST2", estimated);
-        cv::waitKey(1);
+        // cv::Mat debug_img = image_view.clone();//cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC3);
+        // cv::Mat mask_est = cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC1);
+        // for(int i = 0; i < objects_.size(); ++i){
+        //     drawSemanticInfo(mask_est, objects_[i]->Q(), cam_pose, 255, &debug_img);
+        // }
+        // cv::imshow("TEST1",image_view);
+        // cv::imshow("TEST2", debug_img);
+        // cv::waitKey(1);
     }
 }
