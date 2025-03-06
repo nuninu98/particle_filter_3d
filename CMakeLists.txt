@@ -214,6 +214,12 @@ target_link_libraries(test_particle_filter
   #yolo_protocol
 )
 
+add_executable(test_lidar_degen src/test_node/test_lidar_degen.cpp)
+add_dependencies(test_lidar_degen ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_lidar_degen
+  ${catkin_LIBRARIES}
+
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries

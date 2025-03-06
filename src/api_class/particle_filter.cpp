@@ -142,7 +142,7 @@ namespace PARTICLE_FILTER_3D{
         pcl::fromROSMsg(*cloud, raw_lidar);
         pcl::transformPointCloud(raw_lidar, *lidar_robot, tf_lidar2_robot_);
         
-        voxelize(lidar_robot, lidar_robot_ds, 0.3);
+        voxelize(lidar_robot, lidar_robot_ds, 0.2);
         
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
         double test = 0.0;
@@ -239,12 +239,12 @@ namespace PARTICLE_FILTER_3D{
         random_device rd;
         mt19937 gen(rd());
 
-        normal_distribution<double> nd_vx(0.0,  alpha_v_* abs(odom->twist.twist.linear.x));
-        normal_distribution<double> nd_vy(0.0,  alpha_v_* abs(odom->twist.twist.linear.y));
-        normal_distribution<double> nd_vz(0.0,  alpha_v_* abs(odom->twist.twist.linear.z));
-        normal_distribution<double> nd_wx(0.0, alpha_w_* abs(odom->twist.twist.angular.x));
-        normal_distribution<double> nd_wy(0.0, alpha_w_* abs(odom->twist.twist.angular.y));
-        normal_distribution<double> nd_wz(0.0, alpha_w_* abs(odom->twist.twist.angular.z));
+        normal_distribution<double> nd_vx(0.0,  max(alpha_v_* abs(odom->twist.twist.linear.x), 0.3));
+        normal_distribution<double> nd_vy(0.0,  max(alpha_v_* abs(odom->twist.twist.linear.y), 0.3));
+        normal_distribution<double> nd_vz(0.0,  max(alpha_v_* abs(odom->twist.twist.linear.z), 0.3));
+        normal_distribution<double> nd_wx(0.0,  max(alpha_w_* abs(odom->twist.twist.angular.x), 0.1));
+        normal_distribution<double> nd_wy(0.0,  max(alpha_w_* abs(odom->twist.twist.angular.y), 0.1));
+        normal_distribution<double> nd_wz(0.0,  max(alpha_w_* abs(odom->twist.twist.angular.z), 0.1));
         gtsam::Pose3 P_odomprev(gtsam::Rot3::Quaternion(last_odom_.pose.pose.orientation.w, last_odom_.pose.pose.orientation.x, last_odom_.pose.pose.orientation.y, last_odom_.pose.pose.orientation.z), 
                                 gtsam::Point3(last_odom_.pose.pose.position.x, last_odom_.pose.pose.position.y, last_odom_.pose.pose.position.z));
         
