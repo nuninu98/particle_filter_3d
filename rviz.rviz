@@ -16,6 +16,7 @@ Panels:
         - /Odometry2/Shape1
         - /Odometry3
         - /Odometry3/Shape1
+        - /PointCloud24
       Splitter Ratio: 0.5
     Tree Height: 746
   - Class: rviz/Selection
@@ -349,13 +350,33 @@ Visualization Manager:
       Topic: /preintegration_flag
       Unreliable: false
       Value: false
-    - Class: rviz/MarkerArray
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz/PointCloud2
+      Color: 255; 255; 255
+      Color Transformer: Intensity
+      Decay Time: 0
       Enabled: true
-      Marker Topic: /map_objects
-      Name: MarkerArray
-      Namespaces:
-        "": true
-      Queue Size: 100
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Min Color: 0; 0; 0
+      Name: PointCloud2
+      Position Transformer: XYZ
+      Queue Size: 10
+      Selectable: true
+      Size (Pixels): 5
+      Size (m): 0.009999999776482582
+      Style: Points
+      Topic: /object_cloud
+      Unreliable: false
+      Use Fixed Frame: true
+      Use rainbow: true
       Value: true
   Enabled: true
   Global Options:
@@ -385,7 +406,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 25.76506805419922
+      Distance: 26.075298309326172
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -403,7 +424,7 @@ Visualization Manager:
       Near Clip Distance: 0.009999999776482582
       Pitch: 1.5697963237762451
       Target Frame: <Fixed Frame>
-      Yaw: 2.0268540382385254
+      Yaw: 0.4618281126022339
     Saved: ~
 Window Geometry:
   Displays:

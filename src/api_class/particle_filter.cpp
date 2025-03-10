@@ -15,15 +15,17 @@ namespace PARTICLE_FILTER_3D{
         pnh_.param<string>("lidar_topic", lidar_topic, "velodyne_points");
         sub_lidar_ = nh_.subscribe(lidar_topic, 1, &ParticleFilter::lidarCallback, this);
         
-        string map_file_path = "";
-        pnh_.param<string>("map_file", map_file_path, "odometry/filtered");
-        pcl::io::loadPCDFile(map_file_path, pcd_map_);
+        string map_folder = "";
+        pnh_.param<string>("map_folder", map_folder, "");
+        string map_file = "";
+        pnh_.param<string>("map_file", map_file, "");
+        pcl::io::loadPCDFile(map_folder + "/"+map_file, pcd_map_);
 
-        string object_file_path = "";
-        pnh_.param<string>("object_file", object_file_path, "");
+        vector<string> objects;
+        pnh_.param<vector<string>>("objects", objects, vector<string>());
         
-        if(!loadObjectMap(object_file_path)){
-            ROS_ERROR_STREAM("No such object file: " + object_file_path);
+        if(!loadObjectMap(map_folder, objects)){
+            ROS_ERROR_STREAM("Failed to load objects");
         }
 
         pnh_.param<bool>("publish_odom_tf", pub_odom_tf_, false);    
@@ -43,7 +45,7 @@ namespace PARTICLE_FILTER_3D{
         initialize(Eigen::Matrix4d::Identity());
         
         pub_pose_ = nh_.advertise<nav_msgs::Odometry>("localization_pose", 1);
-        pub_map_objects_ = nh_.advertise<visualization_msgs::MarkerArray>("map_objects", 1);
+        pub_object_cloud_ = nh_.advertise<sensor_msgs::PointCloud2>("object_cloud", 1);
                 
         bool enable_preintegration = false;
         pnh_.param<bool>("imu_preintegration/enable", enable_preintegration, false); 
@@ -415,45 +417,19 @@ namespace PARTICLE_FILTER_3D{
         map_ros.header.frame_id = "map";
         pub_map_.publish(map_ros);
 
-        visualization_msgs::MarkerArray obj_vis;
-        ros::Time stamp = ros::Time::now();
-        for(int i = 0; i < objects_.size(); ++i){
-            gtsam_quadrics::ConstrainedDualQuadric Q = objects_[i]->Q();
-            string name = objects_[i]->name();
-            visualization_msgs::Marker base;
-            base.header.frame_id = "map";
-            base.header.stamp = stamp;
-            base.pose.position.x = Q.pose().translation().x();
-            base.pose.position.y = Q.pose().translation().y();
-            base.pose.position.z = Q.pose().translation().z();
-            Eigen::Quaterniond q(Q.pose().matrix().block<3, 3>(0, 0));
-            base.pose.orientation.w = q.w();
-            base.pose.orientation.x = q.x();
-            base.pose.orientation.y = q.y();
-            base.pose.orientation.z = q.z();
-            base.color.a = 1.0;
-            
-            visualization_msgs::Marker obj_quad = base;
-            obj_quad.id = 2*i;
-            obj_quad.type = visualization_msgs::Marker::SPHERE;
-            obj_quad.scale.x = Q.radii()(0);
-            obj_quad.scale.y = Q.radii()(1);
-            obj_quad.scale.z = Q.radii()(2);
-            obj_quad.color.r = 255.0;
-            obj_quad.color.g = 0.0;
-            obj_quad.color.b = 255.0;
-
-            visualization_msgs::Marker name_text = base;
-            name_text.type = visualization_msgs::Marker::TEXT_VIEW_FACING;
-            name_text.id = 2*i + 1;
-            name_text.text = name;
-            name_text.scale.x = Q.radii().norm();
-            name_text.scale.y = Q.radii().norm();
-            name_text.scale.z = Q.radii().norm();
-            obj_vis.markers.push_back(obj_quad);
-            obj_vis.markers.push_back(name_text);
+        pcl::PointCloud<pcl::PointXYZI> obj_cloud;
+        for(int i = 0; i < object_cloud_.size(); ++i){
+            for(auto& pt : object_cloud_[i].points){
+                pt.intensity = 100.0 * (i+1);
+            }
+            obj_cloud = obj_cloud + object_cloud_[i];
         }
-        pub_map_objects_.publish(obj_vis);
+        sensor_msgs::PointCloud2 obj_ros;
+        pcl::toROSMsg(obj_cloud, obj_ros);
+        obj_ros.header.frame_id = "map";
+        obj_ros.header.stamp = ros::Time::now();
+        pub_object_cloud_.publish(obj_ros);
+
     }
 
     void ParticleFilter::publishParticle(){
@@ -510,131 +486,71 @@ namespace PARTICLE_FILTER_3D{
         initialize(pose_se3);
     }
 
-    bool ParticleFilter::loadObjectMap(const string& path){ // name x y z qw qx qy qz rx ry tz
-        ifstream object_file(path);
-        if(!object_file.good()){
-            return false;
+    bool ParticleFilter::loadObjectMap(const string& folder, const vector<string>& objects){ // name x y z qw qx qy qz rx ry tz
+        object_cloud_.clear();
+        name_ids_.clear();
+        for(size_t i = 0; i < objects.size(); ++i){
+            pcl::PointCloud<pcl::PointXYZI> obj_cloud;
+            pcl::io::loadPCDFile(folder + "/"+objects[i]+".pcd", obj_cloud);
+            if(name_ids_.find(objects[i]) == name_ids_.end()){
+                name_ids_.insert({objects[i], i});
+            }
+            object_cloud_.push_back(obj_cloud);
         }
-        for(string line; getline(object_file, line);){
-            vector<string> splitted;
-            string str_left = line;
-            while(!str_left.empty()){
-                int id = str_left.find(" ");
-                if(id == string::npos){
-                    splitted.push_back(str_left);
-                    break;
-                }
-                string split = str_left.substr(0, id);
-                str_left = str_left.substr(id + 1);
-                splitted.push_back(split);
-            }
-            if(splitted.size() != 11){
-                return false;
-            }
-            string name = splitted[0];
-            
-            gtsam::Vector3 radii;
-            Eigen::Matrix4d se3 = Eigen::Matrix4d::Identity();
-            se3(0, 3) = stod(splitted[1]);
-            se3(1, 3) = stod(splitted[2]);
-            se3(2, 3) = stod(splitted[3]);
-            double qw = stod(splitted[4]);
-            double qx = stod(splitted[5]);
-            double qy = stod(splitted[6]);
-            double qz = stod(splitted[7]);
-            radii(0) = stod(splitted[8]);
-            radii(1) = stod(splitted[9]);
-            radii(2) = stod(splitted[10]);
-            Eigen::Quaterniond quat(qw, qx, qy, qz);
-            se3.block<3, 3>(0, 0) = quat.toRotationMatrix();
-            
-            gtsam::Pose3 pose(se3);
-            gtsam_quadrics::ConstrainedDualQuadric Q(pose, radii);
-            shared_ptr<Object> obj(new Object(name, Q)); 
-            if(name_ids_.find(name) == name_ids_.end()){
-                name_ids_.insert({name, objects_.size()});
-            }
-            objects_.push_back(obj);
-            
-        }
+        
         return true;
+        // ifstream object_file(path);
+        // if(!object_file.good()){
+        //     return false;
+        // }
+        // for(string line; getline(object_file, line);){
+        //     vector<string> splitted;
+        //     string str_left = line;
+        //     while(!str_left.empty()){
+        //         int id = str_left.find(" ");
+        //         if(id == string::npos){
+        //             splitted.push_back(str_left);
+        //             break;
+        //         }
+        //         string split = str_left.substr(0, id);
+        //         str_left = str_left.substr(id + 1);
+        //         splitted.push_back(split);
+        //     }
+        //     if(splitted.size() != 11){
+        //         return false;
+        //     }
+        //     string name = splitted[0];
+            
+        //     gtsam::Vector3 radii;
+        //     Eigen::Matrix4d se3 = Eigen::Matrix4d::Identity();
+        //     se3(0, 3) = stod(splitted[1]);
+        //     se3(1, 3) = stod(splitted[2]);
+        //     se3(2, 3) = stod(splitted[3]);
+        //     double qw = stod(splitted[4]);
+        //     double qx = stod(splitted[5]);
+        //     double qy = stod(splitted[6]);
+        //     double qz = stod(splitted[7]);
+        //     radii(0) = stod(splitted[8]);
+        //     radii(1) = stod(splitted[9]);
+        //     radii(2) = stod(splitted[10]);
+        //     Eigen::Quaterniond quat(qw, qx, qy, qz);
+        //     se3.block<3, 3>(0, 0) = quat.toRotationMatrix();
+            
+        //     gtsam::Pose3 pose(se3);
+        //     gtsam_quadrics::ConstrainedDualQuadric Q(pose, radii);
+        //     shared_ptr<Object> obj(new Object(name, Q)); 
+        //     if(name_ids_.find(name) == name_ids_.end()){
+        //         name_ids_.insert({name, objects_.size()});
+        //     }
+        //     objects_.push_back(obj);
+            
+        // }
+        // return true;
 
     }
 
-    void ParticleFilter::getEstimatedDualConics(const gtsam::Pose3& cam_pose, vector<pair<string, gtsam_quadrics::DualConic>>& output){
-        output.clear();
-        gtsam_quadrics::QuadricCamera q_cam;
-        gtsam_quadrics::AlignedBox2 screen(0, 0, 1280, 720);
-        for(int i = 0; i < objects_.size(); ++i){
-            gtsam_quadrics::ConstrainedDualQuadric dQ = objects_[i]->Q();
-            string name = objects_[i]->name();
-            if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
-                continue;
-            }
-            gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
-            gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
-            if(bbox.iou(screen) < 1.0e-4){
-                continue;
-            }
-            output.push_back({name, dC});
-        }
-        // if(dQ.contains(cam_pose) || dQ.isBehind(cam_pose)){
-        //     return;
-        // }
-        // gtsam_quadrics::DualConic dC = q_cam.project(dQ, cam_pose, K_);
-        // gtsam_quadrics::AlignedBox2 bbox = dC.bounds();
-        // cv::Rect bbox_cv(bbox.xmin(), bbox.ymin(), bbox.width(), bbox.height());
-        // bbox_cv = bbox_cv & cv::Rect(0, 0, mask_output.cols, mask_output.rows);
-        // for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
-        //     for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
-        //         gtsam::Point2 p(x, y);
-        //         if(dC.contains(p)){
-        //             mask_output.at<uchar>(y, x) = label;
-        //         }
-        //     }
-        // }
-        // if(debug != nullptr){
-        //     for(int x = bbox_cv.x; x < bbox_cv.x + bbox_cv.width; ++x){
-        //         for(int y = bbox_cv.y; y < bbox_cv.y + bbox_cv.height; ++y){
-        //             gtsam::Point2 p(x, y);
-        //             if(dC.contains(p)){
-        //                 debug->at<cv::Vec3b>(y, x) = cv::Vec3b(255, 0, 0);
-        //             }
-        //         }
-        //     }
-        //     cv::rectangle(*debug, bbox_cv, cv::Scalar(0, 0, 255), 2);
-        // }
-    }
 
     void ParticleFilter::yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
         yolo_result_ = *yolo_result;
-        //========Testing=================
-        // sensor_msgs::ImageConstPtr color_img = boost::make_shared<sensor_msgs::Image const>(yolo_result->original);
-        // cv_bridge::CvImageConstPtr cv_rgb_bridge = cv_bridge::toCvShare(color_img, "bgr8");
-        // cv::Mat image_view = cv_rgb_bridge->image.clone();
-        // size_t N_detections = yolo_result->masks.size();
-        // vector<cv::Vec3b> colors = {cv::Vec3b(255, 0, 0), cv::Vec3b(0, 255,0), cv::Vec3b(0, 0, 255) };
-        // for(size_t i = 0; i < N_detections; ++i){
-        //     sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
-        //     cv_bridge::CvImageConstPtr mask_bridge = cv_bridge::toCvShare(mask_msg, "mono8");
-        //     cv::Mat mask = mask_bridge->image.clone() > 60;
-        //     image_view.setTo(colors[i %3], mask);
-        // }
-        // gtsam::Pose3 cam_pose(pose_ * Trc_);
-        // sort(objects_.begin(), objects_.end(), [cam_pose](const shared_ptr<Object>& o1, const shared_ptr<Object>& o2){
-        //     gtsam::Point3 c1 = o1->Q().centroid();
-        //     gtsam::Point3 c2 = o2->Q().centroid();
-        //     double d1 = cam_pose.range(c1);
-        //     double d2 = cam_pose.range(c2);
-        //     return d1 > d2;
-        // });
-        // cv::Mat debug_img = image_view.clone();//cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC3);
-        // cv::Mat mask_est = cv::Mat::zeros(image_view.rows, image_view.cols, CV_8UC1);
-        // for(int i = 0; i < objects_.size(); ++i){
-        //     drawSemanticInfo(mask_est, objects_[i]->Q(), cam_pose, 255, &debug_img);
-        // }
-        // cv::imshow("TEST1",image_view);
-        // cv::imshow("TEST2", debug_img);
-        // cv::waitKey(1);
     }
 }

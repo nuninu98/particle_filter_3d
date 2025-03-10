@@ -75,18 +75,19 @@ namespace PARTICLE_FILTER_3D{
             condition_variable submap_cv_;
             mutex submap_mtx_;
             Eigen::Matrix4d submap_updated_pose_;
-
+            bool using_submap = false;
             mutex kill_mtx_;
             condition_variable kill_cv_;
             bool kill_flag_, kill_done_;
             pcl::PointCloud<pcl::PointXYZI> pcd_map_;
-            vector<shared_ptr<Object>> objects_;
+            //vector<shared_ptr<Object>> objects_;
+            vector<pcl::PointCloud<pcl::PointXYZI>> object_cloud_;
             unordered_map<string, size_t> name_ids_;
             nav_msgs::Odometry last_odom_;
 
             ros::Publisher pub_map_;
             ros::Publisher pub_particles_;
-            ros::Publisher pub_map_objects_;
+            ros::Publisher pub_object_cloud_;
 
             pcl::VoxelGrid<pcl::PointXYZI> voxel_;
 
@@ -122,7 +123,7 @@ namespace PARTICLE_FILTER_3D{
 
             void initialPoseCallback(const geometry_msgs::PoseWithCovarianceStampedConstPtr& pose_2d);
 
-            bool loadObjectMap(const string& path);
+            bool loadObjectMap(const string& folder, const vector<string>& objects);
 
             double initOdomStamp_ = -1;
 
