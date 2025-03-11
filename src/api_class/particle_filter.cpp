@@ -13,7 +13,7 @@ namespace PARTICLE_FILTER_3D{
 
         string lidar_topic = "";
         pnh_.param<string>("lidar_topic", lidar_topic, "velodyne_points");
-        sub_lidar_ = nh_.subscribe(lidar_topic, 1, &ParticleFilter::lidarCallback, this);
+        sub_lidar_ = nh_.subscribe(lidar_topic, 1, &ParticleFilter::lidarCallback, this, ros::TransportHints().tcpNoDelay());
         
         string map_folder = "";
         pnh_.param<string>("map_folder", map_folder, "");
@@ -51,7 +51,7 @@ namespace PARTICLE_FILTER_3D{
         pnh_.param<bool>("imu_preintegration/enable", enable_preintegration, false); 
         if(enable_preintegration){
             ip_ = new IMUPreintegration();
-            sub_odometry_ = nh_.subscribe("imu_odom", 1, &ParticleFilter::odomCallback, this);
+            sub_odometry_ = nh_.subscribe("imu_odom", 1, &ParticleFilter::odomCallback, this, ros::TransportHints().tcpNoDelay());
         }
         else{
             string odom_topic = "";
@@ -148,14 +148,14 @@ namespace PARTICLE_FILTER_3D{
         
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
         double test = 0.0;
-        submap_mtx_.lock();
-        GridMap3D gm(grid_submap_);
-        submap_mtx_.unlock();
+        //submap_mtx_.lock();
+        //GridMap3D gm(grid_submap_); //copy submap solves prob
+        //submap_mtx_.unlock();
         
-        for(int cnt = 0; cnt < 3; cnt++){
+        for(int cnt = 0; cnt < 1; cnt++){
             #pragma omp parallel for
             for(size_t i = 0; i < N_particles_; ++i){
-                gm.updateScore(lidar_robot_ds, particles_[i]);
+                grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
             }
             
             double weigth_sum = 0.0;
@@ -224,7 +224,6 @@ namespace PARTICLE_FILTER_3D{
 
     void ParticleFilter::odomCallback(const nav_msgs::OdometryConstPtr& odom){
         unique_lock<mutex> lock(mtx_);
-        
         //=============================Particle Prediction=====================
         if(last_odom_.header.stamp == ros::Time(0.0)){
             last_odom_ = *odom;

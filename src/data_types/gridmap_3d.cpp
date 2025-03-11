@@ -18,6 +18,7 @@ namespace PARTICLE_FILTER_3D{
     }
 
     void GridMap3D::initialize(double x_size, double y_size, double z_size, double resolution){
+        unique_lock<mutex> lock(lock_);
         resolution_ = resolution;
         x_grids_ = x_size / resolution;
         y_grids_ = y_size / resolution;
@@ -26,6 +27,7 @@ namespace PARTICLE_FILTER_3D{
     }
 
     void GridMap3D::generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose){
+        unique_lock<mutex> lock(lock_);
         occupied_.resize(x_grids_ * y_grids_ * z_grids_, false);
         Eigen::Vector3d tvec = robot_pose.block<3, 1>(0, 3);
         double x_size = resolution_ * x_grids_;
@@ -47,6 +49,7 @@ namespace PARTICLE_FILTER_3D{
     }
 
     void GridMap3D::updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p){
+        unique_lock<mutex> lock(lock_);
         pcl::PointCloud<pcl::PointXYZI> tf_cloud;
         pcl::transformPointCloud(robot_tf_lidar, tf_cloud, p.getPose());
         int weight = 0.0;

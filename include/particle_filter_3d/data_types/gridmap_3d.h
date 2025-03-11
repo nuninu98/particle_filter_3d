@@ -22,6 +22,7 @@ namespace PARTICLE_FILTER_3D{
             size_t x_grids_, y_grids_, z_grids_;
 
             int toIndex(int xid, int yid, int zid);
+            mutex lock_;
         public:
             GridMap3D();
 
