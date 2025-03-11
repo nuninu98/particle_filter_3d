@@ -34,7 +34,7 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <gtsam_quadrics/geometry/QuadricCamera.h>
-#include <Eigen/SVD>
+#include <Eigen/SVD> 
 using namespace std;
 namespace PARTICLE_FILTER_3D{
     class ParticleFilter{
@@ -63,7 +63,7 @@ namespace PARTICLE_FILTER_3D{
             ros::Subscriber sub_odometry_;
             ros::Subscriber sub_lidar_;
             Eigen::Matrix4d pose_;
-            Eigen::Matrix4d tf_lidar2_robot_;
+            Eigen::Matrix4d Trl_;
 
             tf2_ros::Buffer buffer_;
             tf2_ros::TransformListener listener_;
@@ -81,7 +81,7 @@ namespace PARTICLE_FILTER_3D{
             bool kill_flag_, kill_done_;
             pcl::PointCloud<pcl::PointXYZI> pcd_map_;
             //vector<shared_ptr<Object>> objects_;
-            vector<pcl::PointCloud<pcl::PointXYZI>> object_cloud_;
+            unordered_map<string, pcl::PointCloud<pcl::PointXYZI>> object_cloud_;
             unordered_map<string, size_t> name_ids_;
             nav_msgs::Odometry last_odom_;
 
@@ -134,12 +134,15 @@ namespace PARTICLE_FILTER_3D{
 
             mutex yolo_lock_;
             yolo_protocol::YoloResult yolo_result_;
+            cv::Mat semantic_mask_;
             ros::Subscriber sub_yolo_;
             boost::shared_ptr<gtsam::Cal3_S2> K_;
             Eigen::Matrix4d Trc_;
+
+            ros::Publisher pub_labeled_cloud_;
             void yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
 
-            void getEstimatedDualConics(const gtsam::Pose3& cam_pose, vector<pair<string, gtsam_quadrics::DualConic>>& output);
+            void resample(pcl::PointCloud<pcl::PointXYZI>& raw_lidar);
         
             omp_lock_t omp_lock_;
             

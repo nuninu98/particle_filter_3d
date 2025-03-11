@@ -17,7 +17,7 @@ namespace PARTICLE_FILTER_3D{
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
             Eigen::Vector3d origin_;
-            vector<bool> occupied_;
+            vector<uint8_t> occupied_;
             double resolution_;
             size_t x_grids_, y_grids_, z_grids_;
 
@@ -33,6 +33,8 @@ namespace PARTICLE_FILTER_3D{
             void initialize(double x_size, double y_size, double z_size, double resolution);
 
             void generateSubmap(const pcl::PointCloud<pcl::PointXYZI>& pcd_map, const Eigen::Matrix4d& robot_pose);
+
+            void setSemanticLabel(const pcl::PointCloud<pcl::PointXYZI>& object_cloud, const uint8_t& label);
 
             void updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p);
     };
