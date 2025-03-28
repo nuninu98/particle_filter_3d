@@ -8,7 +8,8 @@ This package provides 3D LiDAR based Monte Carlo Localization algorithm. It trac
 2. PCL >= 1.8
 3. Eigen >= 3.3
 4. Point cloud map (.pcd)
-5. Semantic point cloud map (Optional)
+5. yolo_protocol
+6. Semantic point cloud map (Optional)
 
 ## Install
 ```
@@ -35,39 +36,29 @@ cd ~/catkin_ws && catkin_make
 - /particles (for vislualization)
 
 ## Setting
-```
-lidar_topic: /velodyne_points
-map_folder: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new"
-map_file: "GlobalMap.pcd"
-objects: ["person", "cell phone", "chair", "bench", "tv"]
-#map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
-#object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
-publish_odom_tf: true
-num_particles: 2000
-alpha_v: 3.0
-alpha_w: 2.0
+The algorithm setting can be modified in param/config.yaml file.
+
+```yaml
+lidar_topic: /velodyne_points # Subscribing LiDAR topic.
+map_folder: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new" # Map folder.
+map_file: "GlobalMap.pcd" # Point cloud map file name.
+objects: ["person", "cell phone", "chair", "bench", "tv"] # Semantic point cloud map files. Optional.
+publish_odom_tf: true # If true, odom -> baselink tf is generated.
+num_particles: 2000 # Number of particles.
+alpha_v: 3.0 # Translational motion noise. Bigger, the particle spreads wider.
+alpha_w: 2.0 # Rotational motion noise. 
 imu_preintegration:
-  enable: true
-  imu_topic: imu/data
-odom_topic: jackal_velocity_controller/odom # if disable the imu_preintegration
+  enable: true # Enable the IMU preintegration.
+  imu_topic: imu/data # IMU topic.
+odom_topic: jackal_velocity_controller/odom # Only if the imu_preintegration disabled.
 camera:
-  enable: true
+  enable: true # use instance segmentation
   R: [0.0, 0.0, 1.0,
     -1.0, 0.0, 0.0,
-    0.0, -1.0, 0.0]
-  t: [0.0, 0.0, 0.5]
-  K: [528.433756558705, 0.0, 320.5, 0.0, 528.433756558705, 240.5, 0.0, 0.0, 1.0]
+    0.0, -1.0, 0.0] # Robot -> Camera rotation matrix
+  t: [0.0, 0.0, 0.5] # Robot -> Camera translation
+  K: [528.433756558705, 0.0, 320.5, 0.0, 528.433756558705, 240.5, 0.0, 0.0, 1.0] # Camera matrix
 ```
-The algorithm setting can be modified in param/config.yaml file.
-- lidar_topic: Subscribing LiDAR topic's name
-- odom_topic: Subscribing wheel odometry topic's name. Only if the IMU preintegration is disabled.
-- map_file: Point cloud map file directory
-- publish_odom_tf: If true, odom -> baselink tf is generated
-- num_partices: Particle numbers
-- alpha_v : Particles spreads wider in the case of translational movement.
-- alpha_w : Particles spreads wider in the case of rotational movement.
-
-- imu_preintegration/enable : 
 
 ## Demo and Experiment
 The command below can run the localization. 
@@ -76,10 +67,9 @@ roslaunch particle_filter_3d particle_filter.launch
 ```
 Experiment result is posted as the paper:
 
-
 [Dynamic Environment Robust 3D LiDAR Based Monte Carlo Localization.pdf](https://github.com/user-attachments/files/15924770/Dynamic.Environment.Robust.3D.LiDAR.Based.Monte.Carlo.Localization.pdf)
 
 Demo GIF
-
-
 ![particle filter](https://github.com/nuninu98/particle_filter_3d/assets/36870891/81c6ba3e-2962-4cfb-a360-70ef27d6d3da)
+
+If the IMU preintegration enabled, first set the initial pose guess using RVIZ. Then do not move the robot for at least 5 secs(Requires IMU initialization).
