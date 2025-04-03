@@ -5,7 +5,7 @@ objects: ["person", "cell phone", "chair", "bench", "tv"]
 #map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
 #object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
 publish_odom_tf: true
-num_particles: 2000
+num_particles: 1500
 alpha_v: 3.0
 alpha_w: 2.0
 imu_preintegration:
@@ -18,4 +18,4 @@ camera:
     -1.0, 0.0, 0.0,
     0.0, -1.0, 0.0]
   t: [0.0, 0.0, 0.5]
-  K: [528.433756558705, 0.0, 320.5, 0.0, 528.433756558705, 240.5, 0.0, 0.0, 1.0]
+  K: [674.7141017105704, 0.0, 640.5, 0.0, 674.7141017105704, 360.5, 0.0, 0.0, 1.0]

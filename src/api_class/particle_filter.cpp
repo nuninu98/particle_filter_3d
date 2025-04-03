@@ -4,7 +4,7 @@ namespace PARTICLE_FILTER_3D{
     Trl_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), Trc_(Eigen::Matrix4d::Identity()){
         nh_.setCallbackQueue(&queue_);
         particles_.resize(N_particles_, Particle());
-        grid_submap_.initialize(100.0, 100.0, 40.0, 0.1);
+        grid_submap_.initialize(60.0, 60.0, 30.0, 0.05);
 
         int particles_num;
         
@@ -126,9 +126,6 @@ namespace PARTICLE_FILTER_3D{
             }
             while(!submap_flag_queue_.empty()){
                 grid_submap_.generateSubmap(pcd_map_, submap_flag_queue_.front());
-                for(const auto& elem : object_cloud_){
-                    grid_submap_.setSemanticLabel(elem.second, name_ids_[elem.first]);
-                }
                 submap_flag_queue_.pop();
             }
 
@@ -139,31 +136,18 @@ namespace PARTICLE_FILTER_3D{
     void ParticleFilter::resample(pcl::PointCloud<pcl::PointXYZI>& raw_lidar){
         
         //=========Labeling Semantic Info========
+        double ds_rate = 20.0;
+        double lidar_stamp = (double)(raw_lidar.header.stamp) / 1.0e6;
         yolo_lock_.lock();
         auto yolo_res = yolo_result_;
-        cv::Mat yolo_mask = semantic_mask_;
+        cv::Mat yolo_mask;
+        
         yolo_lock_.unlock();
-        double lidar_stamp = (double)(raw_lidar.header.stamp) / 1.0e6;
-        Eigen::Matrix4d Tcl = Trc_.inverse() * Trl_;
-        if(abs(lidar_stamp - yolo_res.header.stamp.toSec()) < 0.05 && !yolo_res.masks.empty()){
-            #pragma omp parallel for
-            for(int i = 0; i < raw_lidar.points.size(); ++i){
-                auto pt = raw_lidar.points[i];
-                Eigen::Vector4d pl(pt.x, pt.y, pt.z, 1.0);
-                Eigen::Vector4d pc = Tcl* pl;
-                raw_lidar.points[i].intensity = 0.0;
-                if(pc(2) < 0 ){
-                    continue;
-                }
-                Eigen::Vector3d pix = K_->matrix() * Eigen::MatrixXd::Identity(3, 4) * pc;
-                pix /= pix(2);
-                if(pix(0) > yolo_mask.cols-1 || pix(0) < 0 || pix(1) > yolo_mask.rows -1 || pix(1) < 0){
-                    continue;
-                }
-                uint8_t label = yolo_mask.at<uchar>(pix(1), pix(0));
-                raw_lidar.points[i].intensity = label;
-            }
+        bool use_semantic = abs(lidar_stamp - yolo_res.header.stamp.toSec()) < 0.05 && !yolo_res.masks.empty();
+        if(use_semantic){
+            cv::resize(semantic_mask_, yolo_mask ,cv::Size(semantic_mask_.cols/ds_rate, semantic_mask_.rows/ds_rate));
         }
+        
         //=======================================
         pcl::PointCloud<pcl::PointXYZI>::Ptr lidar_robot(new pcl::PointCloud<pcl::PointXYZI>());
         pcl::transformPointCloud(raw_lidar, *lidar_robot, Trl_);
@@ -172,8 +156,45 @@ namespace PARTICLE_FILTER_3D{
                 
         #pragma omp parallel for
         for(size_t i = 0; i < N_particles_; ++i){
+            Eigen::Matrix4d Twr = particles_[i].getPose();
+            Eigen::Matrix4d Tcw = (Twr * Trc_).inverse();
             grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
+            if(use_semantic){
+                cv::Mat mask_est = cv::Mat::zeros(semantic_mask_.rows/ds_rate, semantic_mask_.cols/ds_rate, CV_8UC1);
+                for(const auto& nc_pair : object_cloud_){
+                    size_t id = name_ids_[nc_pair.first];
+                    for(const auto& pt : nc_pair.second.points){
+                        Eigen::Vector4d pw(pt.x, pt.y, pt.z, 1.0);
+                        Eigen::Vector4d pc = Tcw* pw;
+                        if(pc(2) < 0){
+                            continue;
+                        }
+                        Eigen::Vector3d pix = K_->matrix() * Eigen::MatrixXd::Identity(3, 4) * pc;
+                        pix /= pix(2);
+                        pix /= ds_rate;
+                        if(pix(0) > yolo_mask.cols-1 || pix(0) < 0 || pix(1) > yolo_mask.rows -1 || pix(1) < 0){
+                            continue;
+                        }
+                        mask_est.at<uchar>(pix(1) , pix(0)) = (uint8_t)id;
+                    }
+                    //cv::dilate(mask_est, mask_est, cv::Mat(), cv::Point(-1, -1));
+                }
+                // if(i == 0){
+                //     cv::imshow("TEST1", yolo_mask* 50);
+                //     cv::imshow("TEST2", mask_est* 50);
+                //     cv::waitKey(1);
+                // }
+                cv::Mat mask_cmp = ((mask_est == yolo_mask) == (mask_est > 0)) / 255;
+                double sum = cv::sum(mask_cmp)[0];
+                // cout<<particles_[i].getWeight()<<" "<<(sum * sum)<<endl;
+                double lambda = 1.0;
+                double weight = particles_[i].getWeight() + lambda* (sum);
+                particles_[i].setWeight(weight);
+            }
+            
+            
         }
+        //cout<<"==="<<endl;
         
         double weigth_sum = 0.0;
         for(size_t i = 0; i < N_particles_; ++i){
@@ -228,13 +249,22 @@ namespace PARTICLE_FILTER_3D{
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
  
         resample(raw_lidar);
-
-        //======Debug Semantic======
-        sensor_msgs::PointCloud2 label_ros;
-        pcl::toROSMsg(raw_lidar, label_ros);
-        label_ros.header = cloud->header;
-        pub_labeled_cloud_.publish(label_ros);
-        //===========================
+        // Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
+        // Eigen::Vector3d v_avg = pose_.block<3, 1>(0, 3);
+        // for(int i = 0; i < N_particles_; ++i){
+        //     Eigen::Vector3d v = particles_[i].getPose().block<3, 1>(0, 3);
+        //     Eigen::Vector3d diff = v - v_avg;
+        //     cov += (diff * diff.transpose())/N_particles_;
+        // }
+        // Eigen::JacobiSVD<Eigen::Matrix3d> svd(cov, Eigen::ComputeFullU | Eigen::ComputeFullV);
+        // auto eigMax = svd.singularValues();
+        // cout<<"eigmax: "<<eigMax.transpose()<<endl;
+        // //======Debug Semantic======
+        // sensor_msgs::PointCloud2 label_ros;
+        // pcl::toROSMsg(raw_lidar, label_ros);
+        // label_ros.header = cloud->header;
+        // pub_labeled_cloud_.publish(label_ros);
+        // //===========================
         publishParticle();
         Eigen::Matrix4d from_submap_update = last_submap_pose.inverse() * pose_;
         if(from_submap_update.block<3, 1>(0, 3).norm() > 10.0){
@@ -355,9 +385,9 @@ namespace PARTICLE_FILTER_3D{
         
         random_device rd;
         mt19937 gen(rd());
-        normal_distribution<double> nd_x(0.0, 0.5);
-        normal_distribution<double> nd_y(0.0, 0.5);
-        normal_distribution<double> nd_z(0.0, 0.5);
+        normal_distribution<double> nd_x(0.0, 0.1);
+        normal_distribution<double> nd_y(0.0, 0.1);
+        normal_distribution<double> nd_z(0.0, 0.2);
         normal_distribution<double> nd_rx(0.0, 0.1);
         normal_distribution<double> nd_ry(0.0, 0.1);
         normal_distribution<double> nd_rz(0.0, 0.1);
@@ -475,7 +505,7 @@ namespace PARTICLE_FILTER_3D{
         ros::Time stamp = ros::Time::now();
         int id = 0;
         for(const auto& p : particles_){
-            if(id % 10 != 0){
+            if(id % 20 != 0){
                 id++;
                 continue;
             }
@@ -500,6 +530,7 @@ namespace PARTICLE_FILTER_3D{
             p_marker.pose.orientation.x = q.x();
             p_marker.pose.orientation.y = q.y();
             p_marker.pose.orientation.z = q.z();
+            p_marker.lifetime = ros::Duration(0.12);
             arr.markers.push_back(p_marker);
             id++;
         }

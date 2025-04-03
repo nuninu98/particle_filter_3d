@@ -48,22 +48,6 @@ namespace PARTICLE_FILTER_3D{
         } 
     }
 
-    void GridMap3D::setSemanticLabel(const pcl::PointCloud<pcl::PointXYZI>& object_cloud, const uint8_t& label){
-        unique_lock<mutex> lock(lock_);
-        for(size_t i = 0; i < object_cloud.size(); ++i){
-            int xid = (object_cloud[i].x - origin_(0))/resolution_;
-            int yid = (object_cloud[i].y - origin_(1))/resolution_;
-            int zid = (object_cloud[i].z - origin_(2))/resolution_;
-            if(xid < 0 || xid >= x_grids_ || yid < 0 || yid >= y_grids_ || zid < 0 || zid >= z_grids_){
-                continue;
-            }
-            int id = toIndex(xid, yid, zid);
-            if(id >= occupied_.size()){
-                continue;
-            }
-            occupied_[id] = label;
-        }
-    }
 
     void GridMap3D::updateScore(const pcl::PointCloud<pcl::PointXYZI>& robot_tf_lidar, Particle& p){
         unique_lock<mutex> lock(lock_);
