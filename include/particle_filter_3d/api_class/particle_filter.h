@@ -42,7 +42,7 @@ namespace PARTICLE_FILTER_3D{
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
             
         private:
-
+            bool ip_init_ = false;
             void voxelize(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_in, pcl::PointCloud<pcl::PointXYZI>& cloud_out, double leaf_size){
                 pcl::PCLPointCloud2Ptr cloud(new pcl::PCLPointCloud2());
                 pcl::toPCLPointCloud2(*cloud_in, *cloud);

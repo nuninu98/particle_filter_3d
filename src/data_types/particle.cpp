@@ -1,11 +1,11 @@
 #include <particle_filter_3d/data_types/particle.h>
 using namespace std;
 namespace PARTICLE_FILTER_3D{
-    Particle::Particle(): weight_(0.0), pose_(Eigen::Matrix4d::Identity()){
+    Particle::Particle(): weight_(1.0), pose_(Eigen::Matrix4d::Identity()){
 
     }
 
-    Particle::Particle(const Eigen::Matrix4d& pose): weight_(0.0), pose_(pose){
+    Particle::Particle(const Eigen::Matrix4d& pose): weight_(1.0), pose_(pose){
 
     }
 

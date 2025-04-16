@@ -221,6 +221,13 @@ target_link_libraries(test_lidar_degen
 
 )
 
+add_executable(test_traj_record src/test_node/test_traj_record.cpp)
+add_dependencies(test_traj_record ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(test_traj_record
+  ${catkin_LIBRARIES}
+
+)
+
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure

@@ -5,12 +5,23 @@ objects: ["person", "cell phone", "chair", "bench", "tv"]
 #map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
 #object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
 publish_odom_tf: true
-num_particles: 1500
-alpha_v: 3.0
-alpha_w: 2.0
+num_particles: 2000
+alpha_v: 5.0
+alpha_w: 0.2
+lidar:
+  R: [1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0]
+  t: [0.0, 0.0, 0.4]
+
 imu_preintegration:
   enable: true
   imu_topic: imu/data
+  R: [1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0]
+  t: [0.0, 0.0, 0.0]
+
 odom_topic: jackal_velocity_controller/odom # if disable the imu_preintegration
 camera:
   enable: true

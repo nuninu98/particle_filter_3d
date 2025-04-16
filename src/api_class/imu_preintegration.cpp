@@ -1,7 +1,7 @@
 #include <particle_filter_3d/api_class/imu_preintegration.h>
 
 namespace PARTICLE_FILTER_3D{
-    IMUPreintegration::IMUPreintegration(): queue_(), spinner_(0, &queue_),
+    IMUPreintegration::IMUPreintegration(): queue_(), spinner_(0, &queue_), pnh_("~"), Tri_(Eigen::Matrix4d::Identity()),
     key_(1), doneFirstOpt_(false), lastImuT_imu_(-1), lastImuT_opt_(-1), imuIntegratorOpt_(nullptr), imuIntegratorImu_(nullptr){
         nh_.setCallbackQueue(&queue_);
 
@@ -27,11 +27,38 @@ namespace PARTICLE_FILTER_3D{
         
         imuIntegratorImu_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias); // setting up the IMU integration for IMU message thread
         imuIntegratorOpt_ = new gtsam::PreintegratedImuMeasurements(p, prior_imu_bias); // setting up the IMU integration for optimization        
-
-        sub_imu_ = nh_.subscribe("/imu/data", 2000, &IMUPreintegration::imuCallback, this);
+        string imu_topic = "";
+        pnh_.param<string>("imu_preintegration/imu_topic", imu_topic, "/imu/data");
+        sub_imu_ = nh_.subscribe(imu_topic, 2000, &IMUPreintegration::imuCallback, this);
         
         pub_imu_odom_ = nh_.advertise<nav_msgs::Odometry>("imu_odom", 1);
 
+        vector<double> R, T;
+        bool has_R = pnh_.param<vector<double>>("imu_preintegration/R", R, vector<double>());
+        if(has_R && R.size() == 9){
+            Tri_(0, 0) = R[0];
+            Tri_(0, 1) = R[1];
+            Tri_(0, 2) = R[2];
+            Tri_(1, 0) = R[3];
+            Tri_(1, 1) = R[4];
+            Tri_(1, 2) = R[5];
+            Tri_(2, 0) = R[6];
+            Tri_(2, 1) = R[7];
+            Tri_(2, 2) = R[8];
+        }
+        else{
+            ROS_WARN("No Rotation matrix in imu_preintegration/R. Use Identity as default.");
+        }
+
+        bool has_T = pnh_.param<vector<double>>("imu_preintegration/t", T, vector<double>());
+        if(has_T && T.size() == 3){
+            Tri_(0, 3) = T[0];
+            Tri_(1, 3) = T[1];
+            Tri_(2, 3) = T[2];
+        }
+        else{
+            ROS_WARN("No Rotation matrix in imu_preintegration/T. Use zero as default.");
+        }
         spinner_.start();
     }
 
@@ -49,10 +76,11 @@ namespace PARTICLE_FILTER_3D{
         double imuTime = imu_data.header.stamp.toSec();
         double dt = (lastImuT_imu_ < 0) ? (1.0/ 500.0) : (imuTime - lastImuT_imu_);
         lastImuT_imu_ = imuTime;
-        imuIntegratorImu_->integrateMeasurement(gtsam::Vector3(imu_data.linear_acceleration.x, imu_data.linear_acceleration.y, imu_data.linear_acceleration.z),
-                                                gtsam::Vector3(imu_data.angular_velocity.x,    imu_data.angular_velocity.y,    imu_data.angular_velocity.z), dt);
+        gtsam::Vector3 acc_robot = Tri_.block<3, 3>(0, 0) * gtsam::Vector3(imu_data.linear_acceleration.x, imu_data.linear_acceleration.y, imu_data.linear_acceleration.z);
+        gtsam::Vector3 w_robot = Tri_.block<3, 3>(0, 0) * gtsam::Vector3(imu_data.angular_velocity.x, imu_data.angular_velocity.y, imu_data.angular_velocity.z);
+        imuIntegratorImu_->integrateMeasurement(acc_robot, w_robot, dt);
         gtsam::NavState currentState = imuIntegratorImu_->predict(prevState_, prevBias_);
-        gtsam::Pose3 robot2Imu(Eigen::Matrix4d::Identity());
+        gtsam::Pose3 robot2Imu(Tri_);
         gtsam::Pose3 imuPose(currentState.quaternion(), currentState.position());
         gtsam::Pose3 robotPose = imuPose.compose(robot2Imu.inverse());
         imu_odom.header.stamp = imu_data.header.stamp;

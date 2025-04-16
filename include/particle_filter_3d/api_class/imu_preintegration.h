@@ -39,7 +39,7 @@ namespace PARTICLE_FILTER_3D{
         public:
             EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         private:
-            ros::NodeHandle nh_;
+            ros::NodeHandle nh_, pnh_;
             ros::CallbackQueue queue_;
             ros::AsyncSpinner spinner_;
             ros::Subscriber sub_imu_;
@@ -78,6 +78,7 @@ namespace PARTICLE_FILTER_3D{
             gtsam::Values graphValues_;
 
             int key_;
+            Eigen::Matrix4d Tri_;
 
             void imuCallback(const sensor_msgs::ImuConstPtr& imu);
 

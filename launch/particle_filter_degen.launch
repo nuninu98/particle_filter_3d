@@ -1,4 +1,5 @@
 <launch>
+
     <param name="use_sim_time" value="true"/>
     <node pkg="tf2_ros" name="static_tf" type="static_transform_publisher" args="0 0 0.4 0 0 0 1 base_link velodyne"/>
     <!-- <node pkg="lio_sam" type="lio_sam_imuPreintegration"   name="lio_sam_imuPreintegration"    output="screen" 	respawn="false"/> -->
@@ -6,4 +7,6 @@
         <rosparam command="load" file="$(find particle_filter_3d)/param/config_degen.yaml" />
     </node>
     <node pkg="particle_filter_3d" name="test_lidar_degen" type="test_lidar_degen"/>
+    <node pkg="particle_filter_3d" name="test_traj_record" type="test_traj_record"/>
+
 </launch>
