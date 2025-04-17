@@ -58,7 +58,7 @@
   <build_depend>pcl_conversions</build_depend>
   <build_depend>gtsam_quadrics</build_depend>
   <build_depend>cv_bridge</build_depend>
-  <build_depend>yolo_protocol</build_depend>
+  <!-- <build_depend>yolo_protocol</build_depend> -->
 
   <build_export_depend>nav_msgs</build_export_depend>
   <build_export_depend>roscpp</build_export_depend>
@@ -68,7 +68,7 @@
   <build_export_depend>tf2_ros</build_export_depend>
   <build_export_depend>pcl_conversions</build_export_depend>
   <build_export_depend>cv_bridge</build_export_depend>
-  <build_export_depend>yolo_protocol</build_export_depend>
+  <!-- <build_export_depend>yolo_protocol</build_export_depend> -->
 
   <exec_depend>nav_msgs</exec_depend>
   <exec_depend>roscpp</exec_depend>
@@ -79,7 +79,7 @@
   <exec_depend>pcl_conversions</exec_depend>
   <exec_depend>gtsam_quadrics</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>yolo_protocol</exec_depend>
+  <!-- <exec_depend>yolo_protocol</exec_depend> -->
 
 
   <!-- The export tag contains other, unspecified, tags -->

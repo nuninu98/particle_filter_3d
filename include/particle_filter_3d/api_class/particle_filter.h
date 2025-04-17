@@ -28,13 +28,14 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <particle_filter_3d/api_class/imu_preintegration.h>
-#include <yolo_protocol/YoloResult.h>
+// #include <yolo_protocol/YoloResult.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 #include <gtsam_quadrics/geometry/QuadricCamera.h>
 #include <Eigen/SVD> 
+#include <unordered_map>
 using namespace std;
 namespace PARTICLE_FILTER_3D{
     class ParticleFilter{
@@ -43,6 +44,8 @@ namespace PARTICLE_FILTER_3D{
             
         private:
             bool ip_init_ = false;
+
+            double vox_size_;
             void voxelize(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud_in, pcl::PointCloud<pcl::PointXYZI>& cloud_out, double leaf_size){
                 pcl::PCLPointCloud2Ptr cloud(new pcl::PCLPointCloud2());
                 pcl::toPCLPointCloud2(*cloud_in, *cloud);
@@ -132,15 +135,15 @@ namespace PARTICLE_FILTER_3D{
             double alpha_v_;
             double alpha_w_;
 
-            mutex yolo_lock_;
-            yolo_protocol::YoloResult yolo_result_;
-            cv::Mat semantic_mask_;
-            ros::Subscriber sub_yolo_;
-            boost::shared_ptr<gtsam::Cal3_S2> K_;
-            Eigen::Matrix4d Trc_;
+            // mutex yolo_lock_;
+            // yolo_protocol::YoloResult yolo_result_;
+            // cv::Mat semantic_mask_;
+            // ros::Subscriber sub_yolo_;
+            // boost::shared_ptr<gtsam::Cal3_S2> K_;
+            // Eigen::Matrix4d Trc_;
 
-            ros::Publisher pub_labeled_cloud_;
-            void yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
+            // ros::Publisher pub_labeled_cloud_;
+            // void yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result);
 
             void resample(pcl::PointCloud<pcl::PointXYZI>& raw_lidar);
         

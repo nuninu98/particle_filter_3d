@@ -1,7 +1,7 @@
 #include <particle_filter_3d/api_class/particle_filter.h>
 namespace PARTICLE_FILTER_3D{
     ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()),
-    Trl_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), Trc_(Eigen::Matrix4d::Identity()){
+    Trl_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), vox_size_(0.2){
         nh_.setCallbackQueue(&queue_);
         particles_.resize(N_particles_, Particle());
         grid_submap_.initialize(60.0, 60.0, 30.0, 0.05);
@@ -21,12 +21,12 @@ namespace PARTICLE_FILTER_3D{
         pnh_.param<string>("map_file", map_file, "");
         pcl::io::loadPCDFile(map_folder + "/"+map_file, pcd_map_);
 
-        vector<string> objects;
-        pnh_.param<vector<string>>("objects", objects, vector<string>());
+        // vector<string> objects;
+        // pnh_.param<vector<string>>("objects", objects, vector<string>());
         
-        if(!loadObjectMap(map_folder, objects)){
-            ROS_ERROR_STREAM("Failed to load objects");
-        }
+        // if(!loadObjectMap(map_folder, objects)){
+        //     ROS_ERROR_STREAM("Failed to load objects");
+        // }
 
         pnh_.param<bool>("publish_odom_tf", pub_odom_tf_, false);    
 
@@ -79,36 +79,38 @@ namespace PARTICLE_FILTER_3D{
 
         pnh_.param<double>("alpha_v", alpha_v_, 3.0); 
         pnh_.param<double>("alpha_w", alpha_w_, 1.0); 
+
+        pnh_.param<double>("voxel_size", vox_size_, 0.2); 
         
         bool enable_camera = false;
         pnh_.param<bool>("camera/enable", enable_camera, false); 
-        if(enable_camera){
-            sub_yolo_ = nh_.subscribe("/image_raw/yolo", 1, &ParticleFilter::yoloResultCallback, this);
-            vector<double> R;
-            pnh_.param<vector<double>>("camera/R", R, vector<double>());
-            Trc_(0, 0) = R[0];
-            Trc_(0, 1) = R[1];
-            Trc_(0, 2) = R[2];
-            Trc_(1, 0) = R[3];
-            Trc_(1, 1) = R[4];
-            Trc_(1, 2) = R[5];
-            Trc_(2, 0) = R[6];
-            Trc_(2, 1) = R[7];
-            Trc_(2, 2) = R[8];
+        // if(enable_camera){
+        //     sub_yolo_ = nh_.subscribe("/image_raw/yolo", 1, &ParticleFilter::yoloResultCallback, this);
+        //     vector<double> R;
+        //     pnh_.param<vector<double>>("camera/R", R, vector<double>());
+        //     Trc_(0, 0) = R[0];
+        //     Trc_(0, 1) = R[1];
+        //     Trc_(0, 2) = R[2];
+        //     Trc_(1, 0) = R[3];
+        //     Trc_(1, 1) = R[4];
+        //     Trc_(1, 2) = R[5];
+        //     Trc_(2, 0) = R[6];
+        //     Trc_(2, 1) = R[7];
+        //     Trc_(2, 2) = R[8];
 
-            vector<double> t;
-            pnh_.param<vector<double>>("camera/t", t, vector<double>());
-            Trc_(0, 3) = t[0];
-            Trc_(1, 3) = t[1];
-            Trc_(2, 3) = t[2];
+        //     vector<double> t;
+        //     pnh_.param<vector<double>>("camera/t", t, vector<double>());
+        //     Trc_(0, 3) = t[0];
+        //     Trc_(1, 3) = t[1];
+        //     Trc_(2, 3) = t[2];
 
-            vector<double> K;
-            pnh_.param<vector<double>>("camera/K", K, vector<double>());
-            K_.reset(new gtsam::Cal3_S2(K[0], K[4], K[1], K[2], K[5]));
-        }
-        yolo_result_.header.stamp = ros::Time(0.0);
+        //     vector<double> K;
+        //     pnh_.param<vector<double>>("camera/K", K, vector<double>());
+        //     K_.reset(new gtsam::Cal3_S2(K[0], K[4], K[1], K[2], K[5]));
+        // }
+        // yolo_result_.header.stamp = ros::Time(0.0);
 
-        pub_labeled_cloud_ = nh_.advertise<sensor_msgs::PointCloud2>("labeld_cloud", 1);
+        // pub_labeled_cloud_ = nh_.advertise<sensor_msgs::PointCloud2>("labeld_cloud", 1);
         omp_init_lock(&omp_lock_);
         spinner_.start();
     }
@@ -156,12 +158,12 @@ namespace PARTICLE_FILTER_3D{
         pcl::PointCloud<pcl::PointXYZI>::Ptr lidar_robot(new pcl::PointCloud<pcl::PointXYZI>());
         pcl::transformPointCloud(raw_lidar, *lidar_robot, Trl_);
         pcl::PointCloud<pcl::PointXYZI> lidar_robot_ds;
-        voxelize(lidar_robot, lidar_robot_ds, 0.2);
+        voxelize(lidar_robot, lidar_robot_ds, vox_size_);
                 
         #pragma omp parallel for
         for(size_t i = 0; i < N_particles_; ++i){
             Eigen::Matrix4d Twr = particles_[i].getPose();
-            Eigen::Matrix4d Tcw = (Twr * Trc_).inverse();
+            // Eigen::Matrix4d Tcw = (Twr * Trc_).inverse();
             grid_submap_.updateScore(lidar_robot_ds, particles_[i]);
         }
         //cout<<"==="<<endl;
@@ -603,19 +605,19 @@ namespace PARTICLE_FILTER_3D{
     }
 
 
-    void ParticleFilter::yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
-        unique_lock<mutex> lock(yolo_lock_);
-        yolo_result_ = *yolo_result;
-        semantic_mask_ = cv::Mat::zeros(yolo_result->original.height, yolo_result->original.width, CV_8UC1);
-        size_t N_detections = yolo_result->masks.size();
-        for(size_t i = 0; i < N_detections; ++i){
-            sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
-            cv_bridge::CvImageConstPtr mask_bridge = cv_bridge::toCvShare(mask_msg, "mono8");
-            cv::Mat mask = mask_bridge->image.clone() > 60;
-            string name = yolo_result->detections.detections[i].header.frame_id;
-            semantic_mask_.setTo(name_ids_[name], mask);
-        }
-        // cv::imshow("test", 50 * semantic_mask_);
-        // cv::waitKey(1);
-    }
+    // void ParticleFilter::yoloResultCallback(const yolo_protocol::YoloResultConstPtr& yolo_result){
+    //     unique_lock<mutex> lock(yolo_lock_);
+    //     yolo_result_ = *yolo_result;
+    //     semantic_mask_ = cv::Mat::zeros(yolo_result->original.height, yolo_result->original.width, CV_8UC1);
+    //     size_t N_detections = yolo_result->masks.size();
+    //     for(size_t i = 0; i < N_detections; ++i){
+    //         sensor_msgs::ImageConstPtr mask_msg = boost::make_shared<sensor_msgs::Image const>(yolo_result->masks[i]);
+    //         cv_bridge::CvImageConstPtr mask_bridge = cv_bridge::toCvShare(mask_msg, "mono8");
+    //         cv::Mat mask = mask_bridge->image.clone() > 60;
+    //         string name = yolo_result->detections.detections[i].header.frame_id;
+    //         semantic_mask_.setTo(name_ids_[name], mask);
+    //     }
+    //     // cv::imshow("test", 50 * semantic_mask_);
+    //     // cv::waitKey(1);
+    // }
 }

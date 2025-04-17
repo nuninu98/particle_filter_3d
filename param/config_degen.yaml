@@ -1,13 +1,11 @@
 lidar_topic: /points_degen
-map_folder: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new"
-map_file: "GlobalMap.pcd"
-objects: ["person", "cell phone", "chair", "bench", "tv"]
-#map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
-#object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
+map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
+map_file: "hospital.pcd"
+voxel_size: 0.2
 publish_odom_tf: true
-num_particles: 2000
-alpha_v: 3.0
-alpha_w: 0.1
+num_particles: 1500
+alpha_v: 0.0
+alpha_w: 0.0
 lidar:
   R: [1.0, 0.0, 0.0,
     0.0, 1.0, 0.0,

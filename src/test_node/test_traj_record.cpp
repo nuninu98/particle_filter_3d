@@ -71,16 +71,25 @@ void saveTrajectory(const string& file_path, const vector<pair<double, Eigen::Ma
 int main(int argc, char** argv){
     ros::init(argc, argv, "test_traj_record");
     ros::NodeHandle nh;
+    ros::NodeHandle pnh("~");
+
+    string folder_path = "";
+    pnh.param<string>("folder", folder_path, "");
+    
+    string trajectory = "";
+    pnh.param<string>("trajectory", trajectory, "");
+
+    string gt = "warehouse_gt.txt";
+    pnh.param<string>("gt", gt, "");
+
     sub_pose = nh.subscribe("localization_pose", 100, poseCallback);
     sub_gt_pose = nh.subscribe("gazebo/model_states", 100, gtPoseCallback);
     while(ros::ok()){
         ros::spinOnce();
     }
-    string folder_path = "/home/nuninu98/test_ws/src/particle_filter_3d/trajectory/";
-    string file_name = "pf_imu_degen_50.txt";
-    saveTrajectory(folder_path + file_name, path);
+    
+    saveTrajectory(folder_path + trajectory, path);
 
-    string file_name_gt = "gt.txt";
-    saveTrajectory(folder_path + file_name_gt, path_gt);
+    saveTrajectory(folder_path + gt, path_gt);
 
 }

@@ -38,7 +38,7 @@ find_package(catkin REQUIRED COMPONENTS
   tf2_ros
   pcl_conversions
   gtsam_quadrics
-  yolo_protocol
+  # yolo_protocol
   cv_bridge
 )
 find_package(PCL 1.10 REQUIRED)
@@ -211,14 +211,15 @@ target_link_libraries(test_particle_filter
   ${OpenMP_CXX_FLAGS}
   Boost::timer
   particle_filter_api
-  #yolo_protocol
 )
 
 add_executable(test_lidar_degen src/test_node/test_lidar_degen.cpp)
 add_dependencies(test_lidar_degen ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_compile_options(test_lidar_degen PRIVATE ${OpenMP_CXX_FLAGS})
+
 target_link_libraries(test_lidar_degen
   ${catkin_LIBRARIES}
-
+  ${OpenMP_CXX_FLAGS}
 )
 
 add_executable(test_traj_record src/test_node/test_traj_record.cpp)
