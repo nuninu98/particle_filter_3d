@@ -3,7 +3,6 @@
 
 #include <particle_filter_3d/data_types/particle.h>
 #include <particle_filter_3d/data_types/gridmap_3d.h>
-#include <particle_filter_3d/data_types/object.h>
 #include <vector>
 #include <ros/ros.h>
 #include <ros/callback_queue.h>
@@ -28,12 +27,11 @@
 #include <visualization_msgs/MarkerArray.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <particle_filter_3d/api_class/imu_preintegration.h>
-// #include <yolo_protocol/YoloResult.h>
+#include <particle_filter_3d/data_types/lidar_denoiser.h>
 #include <cv_bridge/cv_bridge.h>
 #include <opencv2/core.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
-#include <gtsam_quadrics/geometry/QuadricCamera.h>
 #include <Eigen/SVD> 
 #include <unordered_map>
 using namespace std;
@@ -147,6 +145,8 @@ namespace PARTICLE_FILTER_3D{
 
             void resample(pcl::PointCloud<pcl::PointXYZI>& raw_lidar);
         
+            LidarDenoiser* denoiser_;
+
             omp_lock_t omp_lock_;
             
         public:

@@ -1,7 +1,7 @@
 #include <particle_filter_3d/api_class/particle_filter.h>
 namespace PARTICLE_FILTER_3D{
     ParticleFilter::ParticleFilter(): queue_(), spinner_(0, &queue_), pnh_("~"), N_particles_(1000), pose_(Eigen::Matrix4d::Identity()),
-    Trl_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), vox_size_(0.2){
+    Trl_(Eigen::Matrix4d::Identity()), listener_(buffer_), kill_flag_(false), kill_done_(false), vox_size_(0.2), denoiser_(nullptr){
         nh_.setCallbackQueue(&queue_);
         particles_.resize(N_particles_, Particle());
         grid_submap_.initialize(60.0, 60.0, 30.0, 0.05);
@@ -82,8 +82,32 @@ namespace PARTICLE_FILTER_3D{
 
         pnh_.param<double>("voxel_size", vox_size_, 0.2); 
         
-        bool enable_camera = false;
-        pnh_.param<bool>("camera/enable", enable_camera, false); 
+        bool enable_denoiser = false;
+        pnh_.param<bool>("lidar/denoise/enable", enable_denoiser, false);
+        if(enable_denoiser){
+            denoiser_ = new LidarDenoiser;
+            double min_bearing, max_bearing;
+            pnh_.param<double>("lidar/denoise/min_bearing", min_bearing, -180.0);
+            pnh_.param<double>("lidar/denoise/max_bearing", max_bearing, 180.0);
+            denoiser_->setBearingRange(DEG2RAD(min_bearing), DEG2RAD(max_bearing));
+
+            double min_altitude, max_altitude;
+            pnh_.param<double>("lidar/denoise/min_altitude", min_altitude, -15.0);
+            pnh_.param<double>("lidar/denoise/max_altitude", max_altitude, 15.0);
+            denoiser_->setAltitudeRange(DEG2RAD(min_altitude), DEG2RAD(max_altitude));
+        
+            int N_horizontal;
+            pnh_.param<int>("lidar/denoise/horizontal_rays", N_horizontal, 1024);
+            denoiser_->setHorizontalRays(N_horizontal);
+            
+            int N_vertical;
+            pnh_.param<int>("lidar/denoise/vertical_rays", N_vertical, 32);
+            denoiser_->setVerticalRays(N_vertical);
+            
+            int kernel;
+            pnh_.param<int>("lidar/denoise/kernel", kernel, 5);
+            denoiser_->setKernelSize(kernel);
+        }
         // if(enable_camera){
         //     sub_yolo_ = nh_.subscribe("/image_raw/yolo", 1, &ParticleFilter::yoloResultCallback, this);
         //     vector<double> R;
@@ -122,6 +146,7 @@ namespace PARTICLE_FILTER_3D{
         submap_cv_.notify_all();
         waitForKill();
         delete ip_;
+        delete denoiser_;
         omp_destroy_lock(&omp_lock_);
     }
 
@@ -222,11 +247,15 @@ namespace PARTICLE_FILTER_3D{
             return;
         }
        
-        pcl::PointCloud<pcl::PointXYZI> raw_lidar;
-        pcl::fromROSMsg(*cloud, raw_lidar);
+        pcl::PointCloud<pcl::PointXYZI>::Ptr raw_lidar(new pcl::PointCloud<pcl::PointXYZI>());
+        pcl::fromROSMsg(*cloud, *raw_lidar);
         
+        if(denoiser_!= nullptr){
+            denoiser_->filter(raw_lidar, *raw_lidar);
+        }
+
         Eigen::Matrix4d last_submap_pose = submap_updated_pose_;
-        resample(raw_lidar);
+        resample(*raw_lidar);
         
         
         // Eigen::Matrix3d cov = Eigen::Matrix3d::Zero();
@@ -554,54 +583,6 @@ namespace PARTICLE_FILTER_3D{
         }
         
         return true;
-        // ifstream object_file(path);
-        // if(!object_file.good()){
-        //     return false;
-        // }
-        // for(string line; getline(object_file, line);){
-        //     vector<string> splitted;
-        //     string str_left = line;
-        //     while(!str_left.empty()){
-        //         int id = str_left.find(" ");
-        //         if(id == string::npos){
-        //             splitted.push_back(str_left);
-        //             break;
-        //         }
-        //         string split = str_left.substr(0, id);
-        //         str_left = str_left.substr(id + 1);
-        //         splitted.push_back(split);
-        //     }
-        //     if(splitted.size() != 11){
-        //         return false;
-        //     }
-        //     string name = splitted[0];
-            
-        //     gtsam::Vector3 radii;
-        //     Eigen::Matrix4d se3 = Eigen::Matrix4d::Identity();
-        //     se3(0, 3) = stod(splitted[1]);
-        //     se3(1, 3) = stod(splitted[2]);
-        //     se3(2, 3) = stod(splitted[3]);
-        //     double qw = stod(splitted[4]);
-        //     double qx = stod(splitted[5]);
-        //     double qy = stod(splitted[6]);
-        //     double qz = stod(splitted[7]);
-        //     radii(0) = stod(splitted[8]);
-        //     radii(1) = stod(splitted[9]);
-        //     radii(2) = stod(splitted[10]);
-        //     Eigen::Quaterniond quat(qw, qx, qy, qz);
-        //     se3.block<3, 3>(0, 0) = quat.toRotationMatrix();
-            
-        //     gtsam::Pose3 pose(se3);
-        //     gtsam_quadrics::ConstrainedDualQuadric Q(pose, radii);
-        //     shared_ptr<Object> obj(new Object(name, Q)); 
-        //     if(name_ids_.find(name) == name_ids_.end()){
-        //         name_ids_.insert({name, objects_.size()});
-        //     }
-        //     objects_.push_back(obj);
-            
-        // }
-        // return true;
-
     }
 
 

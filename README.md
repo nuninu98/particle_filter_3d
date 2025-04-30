@@ -46,6 +46,20 @@ voxel_size: 0.2 # LiDAR voxel grid downsampling.
 num_particles: 1500 # Number of particles.
 alpha_v: 2.0 # Translational motion noise. Bigger, the particle spreads wider.
 alpha_w: 0.2 # Rotational motion noise. 
+lidar:
+  R: [1.0, 0.0, 0.0,
+    0.0, 1.0, 0.0,
+    0.0, 0.0, 1.0] # robot -> lidar rotation
+  t: [0.0, 0.0, 0.4] # robot ->lidar translation
+  denoise: # Denoising LiDAR for foggy experiment
+    enable: true 
+    min_bearing: -180.0 # LiDAR's minimum bearing. In degree.
+    max_bearing: 180.0 # LiDAR's maximum bearing. In degree.
+    horizontal_rays: 1024 # LiDAR's horizontal rays.
+    min_altitude: -15.0 # LiDAR's minimum altitude. In degree.
+    max_altitude: 15.0 # LiDAR's maximum altitude. In degree.
+    vertical_rays: 32 # LiDAR's channels.
+    kernel: 3 # Median filter's kernel size.
 imu_preintegration:
   enable: true # Enable the IMU preintegration.
   imu_topic: imu/data # IMU topic.
@@ -117,6 +131,27 @@ For the detail in particle_filter_degen.launch, please check the below.
     </node>
 </launch>
 ```
+### Evaluating the trajectory
+
+The following line should be added in the launch file. It subscribes the tracked trajectory of the algorithm, and the ground truth trajectory. 
+```xml
+<launch>
+    <param name="use_sim_time" value="true"/>
+    <node pkg="particle_filter_3d" name="test_traj_record" type="test_traj_record" output="screen"> <!-- For recording data. You can disable this node if you do not need an evaluation. -->
+        <param name="folder" value="$(find particle_filter_3d)/trajectory/"/> <!-- Data saving folder directory -->
+        <param name="gt" value="warehouse_gt.txt"/> <!-- Saving ground truth trajectory  -->
+        <param name="trajectory" value="warehouse_pf_imu.txt"/> <!-- Saving generated trajectory by this algorithm -->
+    </node>
+</launch>
+```
+
+As the launch file terminated, the file will be recorded in the directory you set.
+
+To evaluate the tracking accuracy, run plot_traj.py by the following command:
+```
+python3 trajectory/plot_traj.py
+```
+If you run the code, it prints the RMSE, maximum error, and plots the trajectory for both 2D and 3D. 
 
 Experiment result is posted as the paper:
 

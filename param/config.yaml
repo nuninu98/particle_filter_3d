@@ -1,19 +1,29 @@
 lidar_topic: /velodyne_points
 map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
-map_file: "hospital.pcd"
+map_file: "warehouse.pcd"
 # objects: ["person", "cell phone", "chair", "bench", "tv"]
 #map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
 #object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
 publish_odom_tf: true
 voxel_size: 0.2
-num_particles: 1500
-alpha_v: 2.0
+num_particles: 1000
+alpha_v: 3.0
 alpha_w: 0.2
 lidar:
   R: [1.0, 0.0, 0.0,
     0.0, 1.0, 0.0,
     0.0, 0.0, 1.0]
   t: [0.0, 0.0, 0.4]
+  denoise:
+    enable: false
+    min_bearing: -180.0 #in deg
+    max_bearing: 180.0
+    horizontal_rays: 1024
+    min_altitude: -15.0 #in deg
+    max_altitude: 15.0
+    vertical_rays: 32
+    kernel: 3
+
 
 imu_preintegration:
   enable: true

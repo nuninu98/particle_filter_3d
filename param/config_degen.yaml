@@ -1,16 +1,25 @@
 lidar_topic: /points_degen
 map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
-map_file: "hospital.pcd"
-voxel_size: 0.2
+map_file: "warehouse.pcd"
+voxel_size: 0.4
 publish_odom_tf: true
 num_particles: 1500
-alpha_v: 0.0
-alpha_w: 0.0
+alpha_v: 3.0
+alpha_w: 0.2
 lidar:
   R: [1.0, 0.0, 0.0,
     0.0, 1.0, 0.0,
     0.0, 0.0, 1.0]
   t: [0.0, 0.0, 0.4]
+  denoise:
+    enable: true
+    min_bearing: -180.0 #in deg
+    max_bearing: 180.0
+    horizontal_rays: 1024
+    min_altitude: -15.0 #in deg
+    max_altitude: 15.0
+    vertical_rays: 32
+    kernel: 3
 
 imu_preintegration:
   enable: true

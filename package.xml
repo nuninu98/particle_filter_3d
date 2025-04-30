@@ -56,7 +56,6 @@
   <build_depend>visualization_msgs</build_depend>
   <build_depend>tf2_ros</build_depend>
   <build_depend>pcl_conversions</build_depend>
-  <build_depend>gtsam_quadrics</build_depend>
   <build_depend>cv_bridge</build_depend>
   <!-- <build_depend>yolo_protocol</build_depend> -->
 
@@ -77,7 +76,6 @@
   <exec_depend>visualization_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>pcl_conversions</exec_depend>
-  <exec_depend>gtsam_quadrics</exec_depend>
   <exec_depend>cv_bridge</exec_depend>
   <!-- <exec_depend>yolo_protocol</exec_depend> -->
 

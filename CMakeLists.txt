@@ -37,7 +37,6 @@ find_package(catkin REQUIRED COMPONENTS
   visualization_msgs
   tf2_ros
   pcl_conversions
-  gtsam_quadrics
   # yolo_protocol
   cv_bridge
 )
@@ -161,7 +160,7 @@ include_directories(
 add_library(particle_filter_datatype_lib STATIC
   src/data_types/particle.cpp
   src/data_types/gridmap_3d.cpp
-  src/data_types/object.cpp
+  src/data_types/lidar_denoiser.cpp
 )
 add_dependencies(particle_filter_datatype_lib ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_options(particle_filter_datatype_lib PRIVATE ${OpenMP_CXX_FLAGS})
@@ -170,8 +169,8 @@ target_link_libraries(particle_filter_datatype_lib
   Eigen3::Eigen
   ${PCL_LIBRARIES}
   ${OpenMP_CXX_FLAGS}
-  gtsam
-  gtsam_quadrics 
+  ${OpenCV_LIBS} 
+  gtsam 
 )
 
 add_library(imu_preintegration_api STATIC
@@ -216,7 +215,6 @@ target_link_libraries(test_particle_filter
 add_executable(test_lidar_degen src/test_node/test_lidar_degen.cpp)
 add_dependencies(test_lidar_degen ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_compile_options(test_lidar_degen PRIVATE ${OpenMP_CXX_FLAGS})
-
 target_link_libraries(test_lidar_degen
   ${catkin_LIBRARIES}
   ${OpenMP_CXX_FLAGS}
@@ -226,7 +224,15 @@ add_executable(test_traj_record src/test_node/test_traj_record.cpp)
 add_dependencies(test_traj_record ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(test_traj_record
   ${catkin_LIBRARIES}
+)
 
+add_executable(test_lidar_denoise src/test_node/test_lidar_denoise.cpp)
+add_dependencies(test_lidar_denoise ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_compile_options(test_lidar_degen PRIVATE ${OpenMP_CXX_FLAGS})
+target_link_libraries(test_lidar_denoise
+  ${catkin_LIBRARIES}
+  ${OpenMP_CXX_FLAGS}
+  particle_filter_datatype_lib
 )
 
 ## Add cmake target dependencies of the library
