@@ -11,7 +11,7 @@
         <param name="degen_rate" value="0.5"/>
         <param name="lidar" value="velodyne_points"/>
     </node>
-     <node pkg="particle_filter_3d" name="test_lidar_denoise" type="test_lidar_denoise" output="screen"/>
+     <!-- <node pkg="particle_filter_3d" name="test_lidar_denoise" type="test_lidar_denoise" output="screen"/> -->
     <!-- <node pkg="particle_filter_3d" name="test_traj_record" type="test_traj_record" output="screen">
         <param name="folder" value="$(find particle_filter_3d)/trajectory/"/>
         <param name="gt" value="warehouse_gt.txt"/>
