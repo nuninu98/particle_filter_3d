@@ -65,6 +65,17 @@ namespace PARTICLE_FILTER_3D{
                 output.push_back(pt);
             }
         }
+
+        // cv::Mat lidar_img_scaled, lidar_denoise_scaled;
+        // cv::Mat lidar_img_view, lidar_denoise_view;
+        // cv::convertScaleAbs(lidar_img, lidar_img_scaled, 255/30.0);
+        // cv::convertScaleAbs(lidar_denoise, lidar_denoise_scaled, 255/30.0);
+        
+        // cv::flip(lidar_img_scaled, lidar_img_view, 0);
+        // cv::flip(lidar_denoise_scaled, lidar_denoise_view, 0);
+        // cv::imshow("NOISY", lidar_img_view);
+        // cv::imshow("DENOISED", lidar_denoise_view);
+        // cv::waitKey(1);
     }
 
     void LidarDenoiser::setKernelSize(int size){

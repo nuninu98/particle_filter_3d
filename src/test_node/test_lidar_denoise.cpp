@@ -40,6 +40,10 @@ int main(int argc, char** argv){
     ros::NodeHandle nh;
     pub_denoise = nh.advertise<sensor_msgs::PointCloud2>("restored", 1);
     ros::Subscriber sub_lidar = nh.subscribe("points_degen", 1, lidarCallback);
-
+    denoiser.setAltitudeRange(min_alt, max_alt);
+    denoiser.setBearingRange(min_bear, max_bear);
+    denoiser.setHorizontalRays(N_horizontal);
+    denoiser.setVerticalRays(N_vertical);
+    denoiser.setKernelSize(3);
     ros::spin();
 }

@@ -72,7 +72,7 @@ namespace PARTICLE_FILTER_3D{
                 // }
             }
         }
-        p.setWeight(weight*weight);
+        p.setWeight(pow(weight, 4));
     }
        
 }

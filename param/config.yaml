@@ -1,14 +1,14 @@
 lidar_topic: /velodyne_points
 map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
-map_file: "warehouse.pcd"
+map_file: "warehouse_32.pcd"
 # objects: ["person", "cell phone", "chair", "bench", "tv"]
 #map_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/new/GlobalMap.pcd"
 #object_file: "/home/nuninu98/catkin_ws/src/LIO-SAM-Semantic/maps/objects.txt"
 publish_odom_tf: true
-voxel_size: 0.2
+voxel_size: 0.25
 num_particles: 1000
-alpha_v: 3.0
-alpha_w: 0.2
+alpha_v: 2.0
+alpha_w: 1.0
 lidar:
   R: [1.0, 0.0, 0.0,
     0.0, 1.0, 0.0,

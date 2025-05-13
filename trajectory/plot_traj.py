@@ -3,16 +3,21 @@ import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation
 from scipy.spatial.transform import Slerp
 
-gt = np.loadtxt("warehouse_gt.txt")
-pf_imu = np.loadtxt("warehouse_pf_imu.txt")
-pf_odom = np.loadtxt("pf_odom.txt")
-raw_odom = np.loadtxt("raw_odom.txt")
+folder = "hospital"
+gt = np.loadtxt(folder + "/gt.txt")
+pf_imu = np.loadtxt(folder+"/pf_imu.txt")
+pf_odom = np.loadtxt(folder+"/pf_odom.txt")
+raw_odom = np.loadtxt(folder+"/raw_odom.txt")
 
-pf_imu_degen10 = np.loadtxt("warehouse_pf_degen10.txt")
-pf_imu_degen20 = np.loadtxt("pf_imu_degen_20.txt")
-pf_imu_degen30 = np.loadtxt("pf_imu_degen_30.txt")
-pf_imu_degen40 = np.loadtxt("pf_imu_degen_40.txt")
-pf_imu_degen50 = np.loadtxt("pf_imu_degen_50.txt")
+degen10 = np.loadtxt(folder + "/degen_10.txt")
+degen30 = np.loadtxt(folder + "/degen_30.txt")
+degen50 = np.loadtxt(folder + "/degen_50.txt")
+
+degen10_denoise = np.loadtxt(folder + "/degen_10_denoise.txt")
+degen30_denoise = np.loadtxt(folder + "/degen_30_denoise.txt")
+degen50_denoise = np.loadtxt(folder + "/degen_50_denoise.txt")
+
+
 def interpolate(p1, p2, t): #pose1(t, x, y, z, qw, qx, qy, qz) pose2 t1 t2 t
     t1 = p1[0]
     t2 = p2[0]
@@ -77,7 +82,7 @@ def rmse(data, ground_truth):
             if stamp >= ground_truth[pid, 0] and stamp <= ground_truth[pid + 1, 0]:
                 break
             pid = pid + 1
-        if pid >= np.shape(ground_truth)[0]:
+        if pid >= np.shape(ground_truth)[0]-1:
             break
         gt_pose = interpolate(gt[pid], gt[pid + 1], stamp)
         pose = data[i]
@@ -98,7 +103,7 @@ def max_err(data, ground_truth):
             if stamp >= ground_truth[pid, 0] and stamp <= ground_truth[pid + 1, 0]:
                 break
             pid = pid + 1
-        if pid >= np.shape(ground_truth)[0]:
+        if pid >= np.shape(ground_truth)[0]-1:
             break
         gt_pose = interpolate(gt[pid], gt[pid + 1], stamp)
         pose = data[i]
@@ -117,73 +122,101 @@ def travel_dist(data):
         pose_prev = data[i]
     return dist
         
+def plotTrajectory(traj, figure, label, color, use_3d=False):
+    if not use_3d:
+        figure.plot(traj[:,1], traj[:,2], color, label=label)
+    else:
+        figure.plot(traj[:,1], traj[:,2], traj[:,3],color, label=label)
+print("PF+IMU RMSE: ", rmse(pf_imu, gt))
+print("PF+IMU Max Err: ", max_err(pf_imu, gt))
 
+print("PF+ODOM RMSE: ", rmse(pf_odom, gt))
+print("PF+ODOM Max Err: ", max_err(pf_odom, gt))
 
-print("IMU RMSE: ", rmse(pf_imu, gt))
-# print("PF + DR RMSE: ", rmse(pf_odom, gt))
-# print("DR RMSE: ", rmse(raw_odom, gt))
-
-print("IMU Max Err: ", max_err(pf_imu, gt))
-# print("PF + DR Max Err: ", max_err(pf_odom, gt))
-# print("DR Max Err: ", max_err(raw_odom, gt))
+print("Degen10 (Denoise) RMSE: ", rmse(degen10_denoise, gt))
+print("Degen10 (Denoise) Max Err: ", max_err(degen10_denoise, gt))
+print("Degen30 (Denoise) RMSE: ", rmse(degen30_denoise, gt))
+print("Degen30 (Denoise) Max Err: ", max_err(degen30_denoise, gt))
+print("Degen50 (Denoise) RMSE: ", rmse(degen50_denoise, gt))
+print("Degen50 (Denoise) Max Err: ", max_err(degen50_denoise, gt))
 
 print("GT travel: ", travel_dist(gt))
 print("Degen0 travel: ",travel_dist(pf_imu))
-print("Degen10 travel: ",travel_dist(pf_imu_degen10))
-# print("Degen20 travel: ",travel_dist(pf_imu_degen20))
-# print("Degen30 travel: ",travel_dist(pf_imu_degen30))
-# print("Degen40 travel: ",travel_dist(pf_imu_degen40))
-# print("Degen50 travel: ",travel_dist(pf_imu_degen50))
+print("Degen10 (Denoise) travel: ",travel_dist(degen10_denoise))
+print("Degen30 (Denoise) travel: ",travel_dist(degen30_denoise))
+print("Degen50 (Denoise) travel: ",travel_dist(degen50_denoise))
 
-plt.figure(0)
-plt.plot(gt[:,1], gt[:,2], '--k', label='Ground Truth')
-plt.plot(pf_imu[:,1], pf_imu[:,2], '-r', label='PF (IMU Preintegration)')
-# plt.plot(pf_odom[:,1], pf_odom[:,2], '-b', label='PF (Deadreckoning)')
-# plt.plot(raw_odom[:,1], raw_odom[:,2], '-g', label='Deadreckoning')
+fig0 = plt.figure(0)
+fig0_ax = fig0.add_subplot(1, 1, 1)
+plotTrajectory(gt, fig0_ax, 'Ground Truth', '--k')
+plotTrajectory(pf_imu, fig0_ax, 'PF (IMU Preintegration)', '-r')
+plotTrajectory(pf_odom, fig0_ax, 'PF (Deadreckoning)', '-b')
+plotTrajectory(raw_odom, fig0_ax, 'Deadreckoning', '-g')
 plt.title('Trajectory Comparison')
+plt.legend()
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
-plt.legend(loc='upper left', prop={'size': 7})
 
 
 fig1 = plt.figure(1)
-ax1 = fig1.add_subplot(1, 1, 1, projection='3d')
-ax1.set_zlim(-0.5, 0.5)
-ax1.plot3D(pf_imu[:,1], pf_imu[:,2], pf_imu[:, 3], '-r', label='PF (IMU Preintegration)')
-ax1.plot3D(gt[:,1], gt[:,2], gt[:, 3], '--k', label='Ground Truth')
-# ax1.plot3D(pf_odom[:,1], pf_odom[:,2], pf_odom[:, 3], '-b', label='PF (Deadreckoning)')
-# ax1.plot3D(raw_odom[:,1], raw_odom[:,2], raw_odom[:, 3], '-g', label='Deadreckoning')
+fig1_ax = fig1.add_subplot(1, 1, 1, projection='3d')
+plotTrajectory(gt, fig1_ax, 'Ground Truth', '--k', True)
+plotTrajectory(pf_imu, fig1_ax, 'PF (IMU Preintegration)', '-r', True)
+plotTrajectory(pf_odom, fig1_ax, 'PF (Deadreckoning)', '-b', True)
+plotTrajectory(raw_odom, fig1_ax, 'Deadreckoning', '-g', True)
+fig1_ax.set_zlim(-5, 5)
+fig1_ax.set_title('Trajectory Comparison')
+fig1_ax.legend(loc='upper left')
+
+fig2 = plt.figure(2)
+fig2_ax = fig2.add_subplot(1, 1, 1)
+plotTrajectory(gt, fig2_ax, 'Ground Truth', '--k')
+plotTrajectory(degen10, fig2_ax, '10%', '-r')
+plotTrajectory(degen30, fig2_ax, '30%', '-g')
+plotTrajectory(degen50, fig2_ax, '50%', '-b')
+fig2_ax.set_title('Trajectory Under Degeneracy')
+fig2_ax.set_xlabel('x [m]')
+fig2_ax.set_ylabel('y [m]')
+fig2_ax.legend(loc='upper left')
+
+fig3 = plt.figure(3)
+fig3_ax = fig3.add_subplot(1, 1, 1, projection='3d')
+plotTrajectory(gt, fig3_ax, 'Ground Truth', '--k', True)
+plotTrajectory(degen10, fig3_ax, '10%', '-r', True)
+plotTrajectory(degen30, fig3_ax, '30%', '-g', True)
+plotTrajectory(degen50, fig3_ax, '50%', '-b', True)
+fig3_ax.set_title('Trajectory Under Degeneracy')
+fig3_ax.set_xlabel('x [m]')
+fig3_ax.set_ylabel('y [m]')
+fig3_ax.set_zlabel('z [m]')
+fig3_ax.set_zlim(-5, 5)
+fig3_ax.legend(loc='upper left')
+
+fig4 = plt.figure(4)
+fig4_ax = fig4.add_subplot(1, 1, 1)
+plotTrajectory(gt, fig4_ax, 'Ground Truth', '--k')
+plotTrajectory(degen10_denoise, fig4_ax, '10%', '-r')
+plotTrajectory(degen30_denoise, fig4_ax, '30%', '-g')
+plotTrajectory(degen50_denoise, fig4_ax, '50%', '-b')
+fig4_ax.set_title('Trajectory Under Degeneracy (Denoised)')
+fig4_ax.set_xlabel('x [m]')
+fig4_ax.set_ylabel('y [m]')
+fig4_ax.legend(loc='upper left')
+
+fig5 = plt.figure(5)
+fig5_ax = fig5.add_subplot(1, 1, 1, projection='3d')
+plotTrajectory(gt, fig5_ax, 'Ground Truth', '--k', True)
+plotTrajectory(degen10_denoise, fig5_ax, '10%', '-r', True)
+plotTrajectory(degen30_denoise, fig5_ax, '30%', '-g', True)
+plotTrajectory(degen50_denoise, fig5_ax, '50%', '-b', True)
+fig5_ax.set_title('Trajectory Under Degeneracy(Denoised)')
+fig5_ax.set_xlabel('x [m]')
+fig5_ax.set_ylabel('y [m]')
+fig5_ax.set_zlabel('z [m]')
+fig5_ax.set_zlim(-5, 5)
+fig5_ax.legend(loc='upper left')
 
 
-plt.figure(2)
-
-plt.plot(gt[:,1], gt[:,2], '--k', label='Ground Truth')
-plt.plot(pf_imu[:,1], pf_imu[:,2], '-r', label='0%')
-plt.plot(pf_imu_degen10[:,1], pf_imu_degen10[:,2], '-b', label='10%')
-# plt.plot(pf_imu_degen20[:,1], pf_imu_degen20[:,2], '-g', label='20%')
-# plt.plot(pf_imu_degen30[:,1], pf_imu_degen30[:,2], '-m', label='30%')
-# plt.plot(pf_imu_degen40[:,1], pf_imu_degen40[:,2], '-c', label='40%')
-# plt.plot(pf_imu_degen50[:,1], pf_imu_degen50[:,2], '-y', label='50%')
-plt.title('Trajectory Under Degeneracy')
-plt.xlabel('x [m]')
-plt.ylabel('y [m]')
-plt.legend(loc='center', prop={'size': 7})
-
-fig2 = plt.figure(3)
-ax2 = fig2.add_subplot(1, 1, 1, projection='3d')
-ax2.set_zlim(-0.5, 0.5)
-ax2.plot3D(gt[:,1], gt[:,2], gt[:, 3], '--k', label='Ground Truth')
-ax2.plot3D(pf_imu[:,1], pf_imu[:,2], pf_imu[:, 3], '-r', label='0%')
-ax2.plot3D(pf_imu_degen10[:,1], pf_imu_degen10[:,2], pf_imu_degen10[:, 3], '-b', label='10%')
-# ax2.plot3D(pf_imu_degen20[:,1], pf_imu_degen20[:,2], pf_imu_degen20[:, 3], '-g', label='20%')
-# ax2.plot3D(pf_imu_degen30[:,1], pf_imu_degen30[:,2], pf_imu_degen30[:, 3], '-m', label='30%')
-# ax2.plot3D(pf_imu_degen40[:,1], pf_imu_degen40[:,2], pf_imu_degen40[:, 3], '-c', label='40%')
-# ax2.plot3D(pf_imu_degen50[:,1], pf_imu_degen50[:,2], pf_imu_degen50[:, 3], '-y', label='50%')
-ax2.set_title('Trajectory Under Degeneracy')
-ax2.legend(loc='upper left')
-ax2.set_xlabel('x [m]')
-ax2.set_ylabel('y [m]')
-ax2.set_zlabel('z [m]')
 
 # err_rmse = np.array([rmse(pf_imu, gt), rmse(pf_imu_degen10, gt), rmse(pf_imu_degen20, gt), 
 #        rmse(pf_imu_degen30, gt), rmse(pf_imu_degen40, gt), rmse(pf_imu_degen50, gt)])

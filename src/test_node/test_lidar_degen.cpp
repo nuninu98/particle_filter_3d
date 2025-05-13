@@ -19,9 +19,9 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
     double bearing_min = -M_PI;
     double bearing_max = M_PI;
     uniform_real_distribution<> ud_r(0.0, max_range);
+
     uniform_real_distribution<> ud_bearing(bearing_min,  bearing_max);
     uniform_real_distribution<> ud_alt(DEG2RAD(-15.0), DEG2RAD(15.0));
-
     vector<bool> rands(raw_lidar.size(), true);
     uniform_int_distribution<> ud_id(0, raw_lidar.size() - 1);
     int N_drop = degen_rate * raw_lidar.size();
@@ -34,6 +34,8 @@ void lidarCallback(const sensor_msgs::PointCloud2ConstPtr& cloud){
             output.push_back(raw_lidar[i]);
         }
         else{
+            // double range = sqrt(pow(raw_lidar[i].x, 2) + pow(raw_lidar[i].y, 2) + pow(raw_lidar[i].z, 2));
+            // uniform_real_distribution<> ud_r(0.0, range);
             pcl::PointXYZI rand_pt;
             double r = ud_r(gen);
             double theta = ud_bearing(gen);

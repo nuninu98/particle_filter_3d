@@ -1,11 +1,11 @@
 lidar_topic: /points_degen
 map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
-map_file: "warehouse.pcd"
-voxel_size: 0.4
+map_file: "warehouse_32.pcd"
+voxel_size: 0.25
 publish_odom_tf: true
-num_particles: 1500
-alpha_v: 3.0
-alpha_w: 0.2
+num_particles: 1000
+alpha_v: 1.0
+alpha_w: 0.1
 lidar:
   R: [1.0, 0.0, 0.0,
     0.0, 1.0, 0.0,
