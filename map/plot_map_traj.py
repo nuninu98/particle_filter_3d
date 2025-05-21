@@ -2,11 +2,14 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.spatial.transform import Rotation
 from scipy.spatial.transform import Slerp
+import open3d as o3d
 
 folder = "warehouse"
 gt = np.loadtxt(folder + "/gt.txt")
 all_poses = np.loadtxt(folder + "/all_poses.txt")
-
+# loops = np.loadtxt(folder + "/loop_indices.txt")
+pcd = o3d.io.read_point_cloud(folder+"/GlobalMap.pcd")
+pcd_points = np.asarray(pcd.points)
 
 def interpolate(p1, p2, t): #pose1(t, x, y, z, qw, qx, qy, qz) pose2 t1 t2 t
     t1 = p1[0]
@@ -117,6 +120,17 @@ def plotTrajectory(traj, figure, label, color, use_3d=False):
         figure.plot(traj[:,1], traj[:,2], color, label=label)
     else:
         figure.plot(traj[:,1], traj[:,2], traj[:,3],color, label=label)
+
+def plotLoopClosure(loop_closures, figure):
+    length = np.shape(loop_closures)[0]
+    alpha = 0.8
+    for i in range(length):
+        if i == 0:
+            figure.plot([loop_closures[i, 0], loop_closures[i, 3]], [loop_closures[i, 1], loop_closures[i, 4]], '--b', label='Loop Closures', alpha=alpha)
+        else:
+            figure.plot([loop_closures[i, 0], loop_closures[i, 3]], [loop_closures[i, 1], loop_closures[i, 4]], '--b', alpha=alpha)
+        figure.plot(loop_closures[i, 0], loop_closures[i, 1], 'bo',alpha=alpha, markersize=1)
+        figure.plot(loop_closures[i, 3], loop_closures[i, 4], 'bo', alpha=alpha, markersize=1)
 print("PF+IMU RMSE: ", rmse(all_poses, gt))
 print("PF+IMU Max Err: ", max_err(all_poses, gt))
 
@@ -124,7 +138,10 @@ fig0 = plt.figure(0)
 fig0_ax = fig0.add_subplot(1, 1, 1)
 plotTrajectory(gt, fig0_ax, 'Ground Truth', '--k')
 plotTrajectory(all_poses, fig0_ax, 'NV-LIOM', '-r')
-plt.title('Trajectory Comparison')
+# plotLoopClosure(loops, fig0_ax)
+fig0_ax.scatter(pcd_points[:,0], pcd_points[:,1], s=1, color='c', alpha=0.2)
+fig0_ax.set_xlim(-20, 20)
+plt.title('SLAM Trajectory')
 plt.legend()
 plt.xlabel('x [m]')
 plt.ylabel('y [m]')
@@ -135,7 +152,7 @@ fig1_ax = fig1.add_subplot(1, 1, 1, projection='3d')
 plotTrajectory(gt, fig1_ax, 'Ground Truth', '--k', True)
 plotTrajectory(all_poses, fig1_ax, 'NV-LIOM', '-r', True)
 fig1_ax.set_zlim(-5, 5)
-fig1_ax.set_title('Trajectory Comparison')
+fig1_ax.set_title('SLAM Trajectory')
 fig1_ax.legend(loc='upper left')
 
 plt.show()

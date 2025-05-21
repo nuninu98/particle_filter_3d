@@ -1,6 +1,6 @@
 lidar_topic: /points_degen
 map_folder: "/home/nuninu98/test_ws/src/particle_filter_3d/map"
-map_file: "warehouse_32.pcd"
+map_file: "hospital.pcd"
 voxel_size: 0.25
 publish_odom_tf: true
 num_particles: 1000

@@ -82,7 +82,7 @@ int main(int argc, char** argv){
     string gt = "warehouse_gt.txt";
     pnh.param<string>("gt", gt, "");
 
-    sub_pose = nh.subscribe("/jackal_velocity_controller/odom", 100, poseCallback);
+    sub_pose = nh.subscribe("/xx", 100, poseCallback);
     sub_gt_pose = nh.subscribe("gazebo/model_states", 100, gtPoseCallback);
     while(ros::ok()){
         ros::spinOnce();
